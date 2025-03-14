@@ -10,8 +10,7 @@ num_zr = length(zr_indices);
 %% HELP
 figure, 
 plot(1e3*z_ACS ,'.-', 'DisplayName', 'zACS'), hold on
-plot(1e3*zr_values, '*-' ,'DisplayName', 'zr'), hold on
-plot(1e3*z_ACS(zr_indices), 'o-', 'DisplayName', 'zACS close')
+plot(1e3*zr_values, ' ,'DisplayName', 'zr'), hold off
 grid on
 ylabel('[mm]'), legend('Location','best')
 ax = gca; ax.YDir = 'reverse';
