@@ -1,0 +1,6 @@
+function RF_PIXEL_PROCESSED = remove_DC_in_pixel(MEAN_PIXEL,RF_PIXEL, WINDOW)
+
+    O   = ones(1,size(RF_PIXEL,1));
+    MAT_MEAN = O'*MEAN_PIXEL; 
+    RF_PIXEL_PROCESSED = (RF_PIXEL - MAT_MEAN).*WINDOW;
+end
