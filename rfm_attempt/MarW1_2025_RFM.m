@@ -19,16 +19,18 @@ calc2dStats = {@(x) mean(x(:)), @(x) std(x(:)), @(x) 100 * std(x(:)) / mean(x(:)
 pathData = 'C:\Users\armiz\OneDrive\Documentos\MATLAB\dataLIM\dataACS_kwave';
 
 %%%%%%%%%%%%%%% NEW MARCH %%%%%%%%%%%%%%%
-alpha_sam = 1; % ACS 0.4 0.5 0.6 0.7 1
+alpha_sam = 0.7; % ACS 0.4 0.5 0.6 0.7 1
 alpha_ref = 0.4; % ACS 0.4 0.5 0.6 0.7 1
 folderDataSam = 'a_pow1p';
 rf_sam_name = sprintf('rf1_a_%.2g', alpha_sam);
 % rf_sam_name = strrep(rf_sam_name, '.', 'p');
+rf_sam_name = 'sam0';
 SAM = load(fullfile(pathData, folderDataSam, rf_sam_name + ".mat"));
 
 folderDataRef = 'a_pow1p';
 rf_ref_name = sprintf('rf1_a_%.2g', alpha_ref);
 % rf_ref_name = strrep(rf_ref_name, '.', 'p');
+rf_ref_name = 'ref0';
 REF = load(fullfile(pathData, folderDataRef, rf_ref_name + ".mat"));
 %%%%%%%%%%%%%%% NEW MARCH %%%%%%%%%%%%%%%
 
@@ -57,6 +59,8 @@ pars.saran_layer = false;
 pars.ratio_zx    = 1.25;
 pars.window_type = 3; %  (1) Hanning, (2) Tuckey, (3) Hamming, (4) Tchebychev
 
+
+blocksize_wv_r = 12;
 %% RFM V1 
 % Reading experiment settings parameters
 bw              = pars.bw;
@@ -193,7 +197,8 @@ RSp_k(:,:, 1) = RSp_k(:,:, 2); % Assuming the first slice ratios are 1 as there 
 
 %% Reference Depth
 
-blocksize_wv_r = blocksize_wv *2;
+% blocksize_wv_r = blocksize_wv *2;
+blocksize_wv_r = blocksize_wv_r;
 
 wz_r = round(blocksize_wv_r*lambda*(1-overlap)/dz * ratio_zx); % Between windows
 nz_r = 2*round(blocksize_wv_r*lambda/dz /2 * ratio_zx); % Window size
@@ -304,39 +309,39 @@ fprintf('Loop way Elapsed time %.2f \n', t);
 
 %% WAY MATRIX
 % Precompute frequency and depth differences
-delta_f = diff(band_ufr, 1, 1); % (p_ufr-1, 1)
-delta_z = z_ACS_cm - z_ACS_r_cm'; % (m × m_r)
-
-delta_f = reshape(delta_f, [1, 1, p_ufr - 1]);  % (1 × 1 × (p_ufr - 1))
-
-% Define X for all depth and reference depth pairs
-X_mat = -4 * reshape(delta_f, [1, 1, p_ufr - 1]) .* delta_z; % (m × m_r × (p_ufr - 1))
-
-
-% Preallocate attenuation map
-a_local_ufr = zeros(m, n);  
-
-tic;
-for jj = 1:n  % Loop over lateral positions (x_j)
-
-    % Compute y for all (m × m_r × (p_ufr - 1)) at once
-    Y_mat = log(RSp_k_ufr(:, jj, 2:end)) - log(RSp_r_ufr(:, jj, 2:end)); % (m × m_r × (p-1))
-
-    % Solve least squares for all depths at once
-    for ii = 1:m  % Loop over depth positions
-        y_vec = squeeze(Y_mat(ii, :, :));  % Extract row for depth ii (m_r × (p-1))
-        X_vec = squeeze(X_mat(ii, :, :));  % Extract row for depth ii (m_r × (p-1))
-
-        if ~isempty(y_vec)
-            % Solve for local attenuation at (z_k, x_j)
-            a_local_ufr(ii, jj) = (X_vec(:)' * X_vec(:)) \ (X_vec(:)' * y_vec(:)) * 8.686; % Convert Np/cm/MHz to dB/cm/MHz
-        end
-    end
-
-end
-t = toc;
-fprintf('Optimized Matrix Elapsed time %.2f seconds\n', t);
-
+% delta_f = diff(band_ufr, 1, 1); % (p_ufr-1, 1)
+% delta_z = z_ACS_cm - z_ACS_r_cm'; % (m × m_r)
+% 
+% delta_f = reshape(delta_f, [1, 1, p_ufr - 1]);  % (1 × 1 × (p_ufr - 1))
+% 
+% % Define X for all depth and reference depth pairs
+% X_mat = -4 * reshape(delta_f, [1, 1, p_ufr - 1]) .* delta_z; % (m × m_r × (p_ufr - 1))
+% 
+% 
+% % Preallocate attenuation map
+% a_local_ufr = zeros(m, n);  
+% 
+% tic;
+% for jj = 1:n  % Loop over lateral positions (x_j)
+% 
+%     % Compute y for all (m × m_r × (p_ufr - 1)) at once
+%     Y_mat = log(RSp_k_ufr(:, jj, 2:end)) - log(RSp_r_ufr(:, jj, 2:end)); % (m × m_r × (p-1))
+% 
+%     % Solve least squares for all depths at once
+%     for ii = 1:m  % Loop over depth positions
+%         y_vec = squeeze(Y_mat(ii, :, :));  % Extract row for depth ii (m_r × (p-1))
+%         X_vec = squeeze(X_mat(ii, :, :));  % Extract row for depth ii (m_r × (p-1))
+% 
+%         if ~isempty(y_vec)
+%             % Solve for local attenuation at (z_k, x_j)
+%             a_local_ufr(ii, jj) = (X_vec(:)' * X_vec(:)) \ (X_vec(:)' * y_vec(:)) * 8.686; % Convert Np/cm/MHz to dB/cm/MHz
+%         end
+%     end
+% 
+% end
+% t = toc;
+% fprintf('Optimized Matrix Elapsed time %.2f seconds\n', t);
+% 
 
 % Apply constraints to stabilize attenuation estimates
 % a_min = 0.1; % Lower bound for attenuation
@@ -378,6 +383,7 @@ A2 = kron( ones(size(band)) , speye(m*n) );
 caxis_acs = [0 1.1];
 fontSize = 14;
 
+ACS_SLD = ACS_RSLD;
 figure, 
 set(gcf, 'Units', 'pixels', 'Position', [100, 100, 1000, 600]); % [x, y, width, height]
 
@@ -647,8 +653,8 @@ keyboard
 
 % Optimization constants
 tol = 1e-3;
-mu1 = 10^4.5; 
-mu2 = 10^4.5;
+mu1 = 10^3.5; 
+mu2 = 10^3.5;
 
 [m, n, p] = size(SLogRatio);
 mask = ones(m,n,p);
