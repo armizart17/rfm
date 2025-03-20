@@ -24,7 +24,7 @@ pars.saran_layer = false;
 pars.ratio_zx    = 1.25;
 pars.window_type = 3; %  (1) Hanning, (2) Tuckey, (3) Hamming, (4) Tchebychev
 
-blocksize_wv_r = 24;
+blocksize_wv_r = 30;
 
 %% DATAPATHS
 
@@ -550,7 +550,8 @@ ylabel('ACS [dB\cdotcm^{-1}\cdotMHz^{-1}]')
 set(gca,'fontsize',fontSize+2)
 %%
 save_all_figures_to_directory(resultsDir,['Fig_simuLay',num2str(iAcq)]);
-% close all
+close all
+pause(0.05);
 
 end
 

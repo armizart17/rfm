@@ -20,17 +20,17 @@ pathData = 'C:\Users\armiz\OneDrive\Documentos\MATLAB\dataLIM\dataACS_kwave';
 
 %%%%%%%%%%%%%%% NEW MARCH %%%%%%%%%%%%%%%
 alpha_sam = 0.7; % ACS 0.4 0.5 0.6 0.7 1
-alpha_ref = 0.4; % ACS 0.4 0.5 0.6 0.7 1
 folderDataSam = 'a_pow1p';
 rf_sam_name = sprintf('rf1_a_%.2g', alpha_sam);
 % rf_sam_name = strrep(rf_sam_name, '.', 'p');
-rf_sam_name = 'sam0';
+% rf_sam_name = 'sam0';
 SAM = load(fullfile(pathData, folderDataSam, rf_sam_name + ".mat"));
 
+alpha_ref = 0.4; % ACS 0.4 0.5 0.6 0.7 1
 folderDataRef = 'a_pow1p';
 rf_ref_name = sprintf('rf1_a_%.2g', alpha_ref);
 % rf_ref_name = strrep(rf_ref_name, '.', 'p');
-rf_ref_name = 'ref0';
+% rf_ref_name = 'ref0';
 REF = load(fullfile(pathData, folderDataRef, rf_ref_name + ".mat"));
 %%%%%%%%%%%%%%% NEW MARCH %%%%%%%%%%%%%%%
 
@@ -265,11 +265,11 @@ RSp_r(:,:, 1) = RSp_r(:,:, 2); % Assuming the first slice ratios are 1 as there 
 freqL = 3; freqH = 9;
 range = bandFull >= freqL & bandFull <= freqH;
 
-RSp_k_ufr = RSp_k(:,:,range);
-RSp_r_ufr = RSp_r(:,:,range);
+RSp_k_ufr   = RSp_k(:,:,range);
+RSp_r_ufr   = RSp_r(:,:,range);
 
-band_ufr = bandFull(range);
-p_ufr = length(band_ufr);
+band_ufr    = bandFull(range);
+p_ufr       = length(band_ufr);
 
 % Convert depth values to cm
 z_ACS_cm = z_ACS * 1e2;      % Convert from meters to cm
@@ -277,6 +277,37 @@ z_ACS_r_cm = z_ACS_r * 1e2;  % Convert reference depths to cm
 
 a_local_ufr = zeros(m, n); % Preallocate local attenuation matrix (depth x lateral)
 % WAY LOOP
+% tic;
+% for jj = 1:n  % Loop over lateral positions (x_j)
+%     for ii = 1:m  % Loop over depth positions (z_k)
+% 
+%         y_vec = []; % Initialize y vector for this location
+%         X_mat = []; % Initialize X matrix for this location
+% 
+%         for r = 1:m_r  % Loop over reference depths
+%             for i = 2:p_ufr  % Loop over frequency bins
+%                 % Compute y = log(RSnorm) at this depth & lateral position
+%                 y = log(RSp_k_ufr(ii, jj, i)) - log(RSp_r_ufr(r, jj, i));
+% 
+%                 % Define X = -4 * (fi - fi-1) * (zk - zr)
+%                 X = -4 * (band_ufr(i) - band_ufr(i-1)) * (z_ACS_cm(ii) - z_ACS_r_cm(r));
+% 
+%                 % Store values for least squares regression
+%                 y_vec = [y_vec; y(:)];
+%                 X_mat = [X_mat; X];
+%             end
+%         end
+% 
+%         % Solve for local attenuation a(z_k, x_j) using least squares
+%         if ~isempty(y_vec)
+%             a_local_ufr(ii, jj) = ( (X_mat' * X_mat) \ (X_mat' * y_vec) )*Np2dB ;
+%         end
+%     end
+% end
+% t = toc;
+% fprintf('Loop way Elapsed time %.2f \n', t);
+
+
 tic;
 for jj = 1:n  % Loop over lateral positions (x_j)
     for ii = 1:m  % Loop over depth positions (z_k)
@@ -290,7 +321,7 @@ for jj = 1:n  % Loop over lateral positions (x_j)
                 y = log(RSp_k_ufr(ii, jj, i)) - log(RSp_r_ufr(r, jj, i));
                 
                 % Define X = -4 * (fi - fi-1) * (zk - zr)
-                X = -4 * (band_ufr(i) - band_ufr(i-1)) * (z_ACS_cm(ii) - z_ACS_r_cm(r));
+                X = -4 * (band_ufr(i) - band_ufr(i-1)) * (z_ACS_cm(ii) - z_ACS_r_cm(r)) /Np2dB;
 
                 % Store values for least squares regression
                 y_vec = [y_vec; y(:)];
@@ -300,7 +331,7 @@ for jj = 1:n  % Loop over lateral positions (x_j)
 
         % Solve for local attenuation a(z_k, x_j) using least squares
         if ~isempty(y_vec)
-            a_local_ufr(ii, jj) = ( (X_mat' * X_mat) \ (X_mat' * y_vec) )*Np2dB ;
+            a_local_ufr(ii, jj) =  (X_mat' * X_mat) \ (X_mat' * y_vec)  ;
         end
     end
 end
@@ -456,7 +487,7 @@ set(gca,'fontsize',fontSize)
 
 %% SAVE FPR terms WITH FIT UPDATE Feb W3
 
-[m, n, p] = size(RSp);
+[m, n, p] = size(RSp_k_ufr);
 % Make full ACS all freq
 z_ACS_cm = z_ACS*1E2;
 df_MHz = min(diff(band));
@@ -470,7 +501,7 @@ for ff = 1:p
     for jj = 1:n
         % Compute FPR
         % FPR = log(squeeze(squeeze(RSp(:,jj,ff)))) / (4*df_MHz)*Np2dB;
-        FPR = -log(squeeze(squeeze(RSp(:,jj,ff)))) / (4*df_MHz)*Np2dB;
+        FPR = log(squeeze(squeeze(RSp_k_ufr(:,jj,ff)))) / (4*df_MHz)*Np2dB;
         
         % Perform linear fit
         [lin_slope , lin_intercept, lin_y, R_fit] = fit_linear(z_ACS_cm, FPR, 2); 
@@ -556,20 +587,32 @@ sgtitle('Frequency Power Ratio')
 set(gcf, 'Units', 'pixels', 'Position', [100, 100, 900, 700]); % [x, y, width, height] in pixels
 
 % Plot raw FPR data
-plot(z_ACS_cm, FPR_avg_f1, 'r-', 'DisplayName', sprintf('S_{%.2fMHz}/S_{%.2fMHz}', band(idx_f1), band(idx_f1-1)), 'LineWidth', 1.5), hold on
-plot(z_ACS_cm, FPR_avg_f2, 'b-', 'DisplayName', sprintf('S_{%.2fMHz}/S_{%.2fMHz}', band(idx_f2), band(idx_f2-1)), 'LineWidth', 1.5), hold on
-plot(z_ACS_cm, FPR_avg_f3, 'k-', 'DisplayName', sprintf('S_{%.2fMHz}/S_{%.2fMHz}', band(idx_f3), band(idx_f3-1)), 'LineWidth', 1.5), hold on
+plot(z_ACS_cm, FPR_avg_f1, 'r-', 'DisplayName', sprintf('S_{%.2fMHz}/S_{%.2fMHz} (Slope: %.3f)', band(idx_f1), band(idx_f1-1), slope_avg_f1), 'LineWidth', 1.5), hold on
+plot(z_ACS_cm, FPR_avg_f2, 'b-', 'DisplayName', sprintf('S_{%.2fMHz}/S_{%.2fMHz} (Slope: %.3f)', band(idx_f2), band(idx_f2-1), slope_avg_f2), 'LineWidth', 1.5), hold on
+plot(z_ACS_cm, FPR_avg_f3, 'k-', 'DisplayName', sprintf('S_{%.2fMHz}/S_{%.2fMHz} (Slope: %.3f)', band(idx_f3), band(idx_f3-1), slope_avg_f3), 'LineWidth', 1.5), hold on
 
-% Plot linear fits with slope values in the legend
-plot(z_ACS_cm, FPR_fit_avg_f1, 'r--', 'DisplayName', sprintf('Fit: S_{%.2fMHz}/S_{%.2fMHz} (Slope: %.3f)', band(idx_f1), band(idx_f1-1), slope_avg_f1), 'LineWidth', 2), hold on
-plot(z_ACS_cm, FPR_fit_avg_f2, 'b--', 'DisplayName', sprintf('Fit: S_{%.2fMHz}/S_{%.2fMHz} (Slope: %.3f)', band(idx_f2), band(idx_f2-1), slope_avg_f2), 'LineWidth', 2), hold on
-plot(z_ACS_cm, FPR_fit_avg_f3, 'k--', 'DisplayName', sprintf('Fit: S_{%.2fMHz}/S_{%.2fMHz} (Slope: %.3f)', band(idx_f3), band(idx_f3-1), slope_avg_f3), 'LineWidth', 2), hold on
+% Plot linear fits WITHOUT DisplayName
+plot(z_ACS_cm, FPR_fit_avg_f1, 'r--', 'LineWidth', 2), hold on
+plot(z_ACS_cm, FPR_fit_avg_f2, 'b--', 'LineWidth', 2), hold on
+plot(z_ACS_cm, FPR_fit_avg_f3, 'k--', 'LineWidth', 2), hold on
+legend ('Location', 'best');
+
+% Plot raw FPR data
+% plot(z_ACS_cm, FPR_avg_f1, 'r-', 'DisplayName', sprintf('S_{%.2fMHz}/S_{%.2fMHz}', band(idx_f1), band(idx_f1-1)), 'LineWidth', 1.5), hold on
+% plot(z_ACS_cm, FPR_avg_f2, 'b-', 'DisplayName', sprintf('S_{%.2fMHz}/S_{%.2fMHz}', band(idx_f2), band(idx_f2-1)), 'LineWidth', 1.5), hold on
+% plot(z_ACS_cm, FPR_avg_f3, 'k-', 'DisplayName', sprintf('S_{%.2fMHz}/S_{%.2fMHz}', band(idx_f3), band(idx_f3-1)), 'LineWidth', 1.5), hold on
+
+% 
+% % Plot linear fits with slope values in the legend
+% plot(z_ACS_cm, FPR_fit_avg_f1, 'r--', 'DisplayName', sprintf('Fit: S_{%.2fMHz}/S_{%.2fMHz} (Slope: %.3f)', band(idx_f1), band(idx_f1-1), slope_avg_f1), 'LineWidth', 2), hold on
+% plot(z_ACS_cm, FPR_fit_avg_f2, 'b--', 'DisplayName', sprintf('Fit: S_{%.2fMHz}/S_{%.2fMHz} (Slope: %.3f)', band(idx_f2), band(idx_f2-1), slope_avg_f2), 'LineWidth', 2), hold on
+% plot(z_ACS_cm, FPR_fit_avg_f3, 'k--', 'DisplayName', sprintf('Fit: S_{%.2fMHz}/S_{%.2fMHz} (Slope: %.3f)', band(idx_f3), band(idx_f3-1), slope_avg_f3), 'LineWidth', 2), hold on
 
 grid on
 xlabel('Depth [cm]')
 ylabel('FPR [dB/MHz]')
 ylabel('FPR [dB\cdotMHz^{-1}]')
-legend('Location', 'Best')
+
 set(gca, 'FontSize', 14)
 
 
