@@ -169,7 +169,19 @@ alpha_params.dx = dx;
         alpha_std, 'circle', alpha_params, Nx, Ny);
 end
 
-medium.alpha_power = 1.1;
+if strcmp(typeSimu, 'layers_vert')
+alpha_mean = alpha_value;
+alpha_std  = [0 0];
+
+alpha_params.dx = dx;
+alpha_params.layer_pos = 19e-3; % [m]
+
+[medium.alpha_coeff, alpha_coeff_mean, alpha_coeff_std] = patterns(alpha_mean,...
+        alpha_std, 'layers_vert', alpha_params, Nx, Ny);
+
+end
+medium.alpha_power = 1;
+% medium.alpha_power = 1.05;
 medium.alpha_mode = 'no_dispersion';
 
 source_strength = 1e6;
