@@ -16,7 +16,10 @@ calc2dStats = {@(x) mean(x(:)), @(x) std(x(:)), @(x) 100 * std(x(:)) / mean(x(:)
 %% LOAD SAM
 
 % DATA NEW AMZ
-pathData = 'C:\Users\armiz\OneDrive\Documentos\MATLAB\dataLIM\dataACS_kwave';
+% pathData = 'C:\Users\armiz\OneDrive\Documentos\MATLAB\dataLIM\dataACS_kwave';
+
+% DATA LIM PC
+pathData = 'D:\emirandaz\qus\data\attenuation\simu';
 
 %%%%%%%%%%%%%%% NEW MARCH %%%%%%%%%%%%%%%
 alpha_sam = 0.7; % ACS 0.4 0.5 0.6 0.7 1

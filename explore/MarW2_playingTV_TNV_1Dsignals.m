@@ -229,7 +229,7 @@ fprintf('Slope CGS: %f (GT= %.2f)\n', slope_cgs, slope);
 fprintf('================================================\n')
 %%
 %%%%%%%%%%%%%%%% TNV  %%%%%%%%%%%%%%%%
-lambda   = 1;  % Regularization parameter
+lambda   = 2;  % Regularization parameter
 max_iter = 20;
 tol = 2e-3;
 [y_denoised, cost1, err1, fid1, reg1, iter1] = TNV_regularization(y_array, lambda, max_iter, tol);
@@ -286,7 +286,7 @@ grid on;
 
 subplot(144)
 plot(x, y_denoised2(:,1:10:50), 'LineWidth', 1);
-title('EMZ TNV Denoised linear functions');
+title('TNVv2 Denoised linear functions');
 xlabel('x-axis');
 ylabel('y-axis');
 ylim([-5 25]);
