@@ -59,6 +59,7 @@ pars.saran_layer = false;
 pars.ratio_zx    = 1.25;
 pars.window_type = 3; %  (1) Hanning, (2) Tuckey, (3) Hamming, (4) Tchebychev
 
+
 blocksize_wv_r = 12;
 %% RFM V1 
 % Reading experiment settings parameters
@@ -190,7 +191,7 @@ end
 
 % RFM
 RSp_k = zeros(m,n,NFFT);
-RSp_k(:,:, 2:end) = Sp_k(:,:, 2:end) ./ Sp_k(:,:, 1:end-1);
+RSp_k(:,:, 2:end) = Sp_k(:,:, 2:end) ./ Sp_k(:,:, 1:end-1); clear Sp_k
 % For the first slice, keep the ratio the same as the first slice
 RSp_k(:,:, 1) = RSp_k(:,:, 2); % Assuming the first slice ratios are 1 as there is no "i-1"
 
@@ -254,14 +255,15 @@ end
 
 % RFM
 RSp_r = zeros(m_r,n,NFFT);
-RSp_r(:,:, 2:end) = Sp_r(:,:, 2:end) ./ Sp_r(:,:, 1:end-1);
+RSp_r(:,:, 2:end) = Sp_r(:,:, 2:end) ./ Sp_r(:,:, 1:end-1); clear Sp_r
 % For the first slice, keep the ratio the same as the first slice
 RSp_r(:,:, 1) = RSp_r(:,:, 2); % Assuming the first slice ratios are 1 as there is no "i-1"
 
 %% ATTEMPT RFM A_local UFR
 
 % UFR strategy
-freqL = 3; freqH = 9;
+bw_ufr = [3 9];
+freqL = bw_ufr(1); freqH = bw_ufr(2);
 range = bandFull >= freqL & bandFull <= freqH;
 
 RSp_k_ufr   = RSp_k(:,:,range);
@@ -274,111 +276,324 @@ p_ufr       = length(band_ufr);
 z_ACS_cm = z_ACS * 1e2;      % Convert from meters to cm
 z_ACS_r_cm = z_ACS_r * 1e2;  % Convert reference depths to cm
 
-a_local_ufr = zeros(m, n); % Preallocate local attenuation matrix (depth x lateral)
-% WAY LOOP
-% tic;
-% for jj = 1:n  % Loop over lateral positions (x_j)
-%     for ii = 1:m  % Loop over depth positions (z_k)
-% 
-%         y_vec = []; % Initialize y vector for this location
-%         X_mat = []; % Initialize X matrix for this location
-% 
-%         for r = 1:m_r  % Loop over reference depths
-%             for i = 2:p_ufr  % Loop over frequency bins
-%                 % Compute y = log(RSnorm) at this depth & lateral position
-%                 y = log(RSp_k_ufr(ii, jj, i)) - log(RSp_r_ufr(r, jj, i));
-% 
-%                 % Define X = -4 * (fi - fi-1) * (zk - zr)
-%                 X = -4 * (band_ufr(i) - band_ufr(i-1)) * (z_ACS_cm(ii) - z_ACS_r_cm(r));
-% 
-%                 % Store values for least squares regression
-%                 y_vec = [y_vec; y(:)];
-%                 X_mat = [X_mat; X];
-%             end
-%         end
-% 
-%         % Solve for local attenuation a(z_k, x_j) using least squares
-%         if ~isempty(y_vec)
-%             a_local_ufr(ii, jj) = ( (X_mat' * X_mat) \ (X_mat' * y_vec) )*Np2dB ;
-%         end
-%     end
-% end
-% t = toc;
-% fprintf('Loop way Elapsed time %.2f \n', t);
+% Delta MHz 
+df_MHz = band_ufr(2) - band_ufr(1);
 
+% Preallocate cell arrays for storing x_temp and y_temp
+x_temp_all = cell(m, n);
+y_temp_all = cell(m, n);
 
+countX = 0; countY = 0;
 tic;
 for jj = 1:n  % Loop over lateral positions (x_j)
     for ii = 1:m  % Loop over depth positions (z_k)
         
-        y_vec = []; % Initialize y vector for this location
-        X_mat = []; % Initialize X matrix for this location
+        % Temporary storage for this location
+        y_temp = nan(p_ufr, m_r);  % (Frequency, Reference depth)
+        x_temp = nan(p_ufr, m_r);  % (Frequency, Reference depth)
         
-        for r = 1:m_r  % Loop over reference depths
-            for i = 2:p_ufr  % Loop over frequency bins
-                % Compute y = log(RSnorm) at this depth & lateral position
-                y = log(RSp_k_ufr(ii, jj, i)) - log(RSp_r_ufr(r, jj, i));
-                
-                % Define X = -4 * (fi - fi-1) * (zk - zr)
-                X = -4 * (band_ufr(i) - band_ufr(i-1)) * (z_ACS_cm(ii) - z_ACS_r_cm(r)) /Np2dB;
+        for iFreq = 1:p_ufr  % Loop over frequency bins
+            for r = 1:m_r  % Loop over reference depths
 
-                % Store values for least squares regression
-                y_vec = [y_vec; y(:)];
-                X_mat = [X_mat; X];
+                % WAY WITH UNITS
+                y = ( log(RSp_k_ufr(ii, jj, iFreq)) - log(RSp_r_ufr(r, jj, iFreq)) ) / (4*df_MHz)*Np2dB;
+                % if  y == 0
+                %     fprintf('ii=%d, jj=%d, r=%d, iFreq=%d \n', ii, jj, r, iFreq); countY = countY +1;
+                % end
+                X = z_ACS_cm(ii) - z_ACS_r_cm(r);
+                if  X == 0
+                    fprintf('ii=%d, jj=%d, r=%d, iFreq=%d \n', ii, jj, r, iFreq); countX = countX +1;
+                end
+
+
+
+                % Store y and X values in the temporary matrices
+
+                y_temp(iFreq, r) = y;  % (Frequency, Reference depth)
+                x_temp(iFreq, r) = X;  % (Frequency, Reference depth)
             end
-        end
 
-        % Solve for local attenuation a(z_k, x_j) using least squares
-        if ~isempty(y_vec)
-            a_local_ufr(ii, jj) =  (X_mat' * X_mat) \ (X_mat' * y_vec)  ;
+            %%%%%%%%%%%%%%%% TV Denoising %%%%%%%%%%%%%%%%
+            % mu = 5;
+            % tol = 1e-4;
+            % y_og = y_temp(iFreq, :); 
+            % % snr1(i) = mean(Y_row)/std(Y_row);
+            % [M, N] = size(y_og(:));
+            % [y_opt] = IRLS_TV(y_og(:),speye(M*N),mu, M,N,tol,ones(size(M*N)),ones(M*N,1));
+            % y_temp(iFreq, :) = y_opt';
+            %%%%%%%%%%%%%%%% TV Denoising %%%%%%%%%%%%%%%%
         end
+        
+        %%%%%%%%%%%%%%%%%%%%%% PLOT FPR %%%%%%%%%%%%%%%%%%%%%%
+        % if (ii==fix(m/2) && jj==fix(n/6)) || (ii==fix(m/2) && jj==fix(n/2)) || (ii==fix(m/2) && jj==fix(5*n/6)) % different depths
+        if (jj==fix(n/2) && ii==fix(m/6)) || (jj==fix(n/2) && ii==fix(m/2)) || (jj==fix(n/2) && ii==fix(5*m/6)) % different laterals
+            freq1 = 3.5; freq2 = 6; freq3 = 8.5;
+            idx_f1 = find(band_ufr >= freq1, 1, 'first'); idx_f2 = find(band_ufr >= freq2, 1, 'first'); idx_f3 = find(band_ufr >= freq3, 1, 'first');
+            
+            figure;
+            set(gcf, 'Units', 'pixels', 'Position', [100, 100, 1000, 600]); % [x, y, width, height]
+            
+            
+            title_f1 = sprintf('Freq %.2fMHz (a=%.2f)', band_ufr(idx_f1), band_ufr(idx_f1));
+            plot(x_temp_data(idx_f1, :), y_temp(idx_f1, :), 'r.-', 'DisplayName', title_f1 ); 
+            hold on; 
+            title_f2 = sprintf('Freq %.2fMHz (a=%.2f)', band_ufr(idx_f2), band_ufr(idx_f2));
+            plot(x_temp_data(idx_f2, :), y_temp(idx_f2, :), 'b.-', 'DisplayName', title_f2 ); 
+            title_f3 = sprintf('Freq %.2fMHz (a=%.2f)', band_ufr(idx_f3), band_ufr(idx_f3));
+            plot(x_temp_data(idx_f2, :), y_temp(idx_f3, :), 'k.-', 'DisplayName', title_f3 ); 
+            hold off; grid on;
+            title(sprintf('Data at ii = %d, jj = %d', ii, jj));
+            xlabel('X_t [cm]'); ylabel('RS_{norm} [dB/MHz]');
+            legend('Location','best')
+        end
+        %%%%%%%%%%%%%%%%%%%%%% PLOT FPR %%%%%%%%%%%%%%%%%%%%%%
+        x_temp_all{ii, jj} = x_temp;
+        y_temp_all{ii, jj} = y_temp;
+
     end
 end
 t = toc;
 fprintf('Loop way Elapsed time %.2f \n', t);
 
-%% WAY MATRIX
-% Precompute frequency and depth differences
-% delta_f = diff(band_ufr, 1, 1); % (p_ufr-1, 1)
-% delta_z = z_ACS_cm - z_ACS_r_cm'; % (m × m_r)
-% 
-% delta_f = reshape(delta_f, [1, 1, p_ufr - 1]);  % (1 × 1 × (p_ufr - 1))
-% 
-% % Define X for all depth and reference depth pairs
-% X_mat = -4 * reshape(delta_f, [1, 1, p_ufr - 1]) .* delta_z; % (m × m_r × (p_ufr - 1))
-% 
-% 
-% % Preallocate attenuation map
-% a_local_ufr = zeros(m, n);  
-% 
-% tic;
-% for jj = 1:n  % Loop over lateral positions (x_j)
-% 
-%     % Compute y for all (m × m_r × (p_ufr - 1)) at once
-%     Y_mat = log(RSp_k_ufr(:, jj, 2:end)) - log(RSp_r_ufr(:, jj, 2:end)); % (m × m_r × (p-1))
-% 
-%     % Solve least squares for all depths at once
-%     for ii = 1:m  % Loop over depth positions
-%         y_vec = squeeze(Y_mat(ii, :, :));  % Extract row for depth ii (m_r × (p-1))
-%         X_vec = squeeze(X_mat(ii, :, :));  % Extract row for depth ii (m_r × (p-1))
-% 
-%         if ~isempty(y_vec)
-%             % Solve for local attenuation at (z_k, x_j)
-%             a_local_ufr(ii, jj) = (X_vec(:)' * X_vec(:)) \ (X_vec(:)' * y_vec(:)) * 8.686; % Convert Np/cm/MHz to dB/cm/MHz
-%         end
-%     end
-% 
-% end
-% t = toc;
-% fprintf('Optimized Matrix Elapsed time %.2f seconds\n', t);
-% 
+%% ESTIMATION RFM (OLD FOR P¨RESAVED TV)
+
+% Prellocate a_local
+a_rfm = zeros(m, n); % Preallocate local attenuation matrix (depth x lateral)
+tic;
+for jj = 1:n  % Loop over lateral positions (x_j)
+    for ii = 1:m  % Loop over depth positions (z_k)
+
+        x_temp = x_temp_all{ii, jj};
+        y_temp = y_temp_all{ii, jj};
+
+        X_vec = x_temp(:);
+
+        % for i = 1:size(y_temp_data, 1)
+        % 
+        %     Y_row = y_temp_data(i, :);    
+        % 
+        %     %%%%%%%%%%%%%%%% TV Denoising %%%%%%%%%%%%%%%%
+        %     mu = 5;
+        %     tol = 1e-4;
+        % 
+        %     snr1(i) = mean(Y_row)/std(Y_row);
+        %     [M, N] = size(Y_row(:));
+        %     [y_opt] = IRLS_TV(Y_row(:),speye(M*N),mu,M,N,tol,ones(size(M*N)),ones(M*N,1));
+        %     Y_row = y_opt';
+        %     y_temp_data(i, :) = Y_row;
+        % 
+        %     %%%%%%%%%%%%%%%% TV Denoising %%%%%%%%%%%%%%%%
+        % 
+        % end
+        % %
+
+        %%%%%%%%%%%%%%%%%%%%%% PLOT FPR %%%%%%%%%%%%%%%%%%%%%%
+        if (ii==fix(m/2) && jj==fix(n/6)) || (ii==fix(m/2) && jj==fix(n/2)) || (ii==fix(m/2) && jj==fix(5*n/6)) % different depths
+        % if (jj==fix(n/2) && ii==fix(m/6)) || (jj==fix(n/2) && ii==fix(m/2)) || (jj==fix(n/2) && ii==fix(5*m/6)) % different laterals
+            freq1 = 3.5; freq2 = 6; freq3 = 8.5;
+            idx_f1 = find(band_ufr >= freq1, 1, 'first'); idx_f2 = find(band_ufr >= freq2, 1, 'first'); idx_f3 = find(band_ufr >= freq3, 1, 'first');
+            
+
+            [slope_f1, ~, ~, ~] = fit_linear(x_temp(idx_f1, :), y_temp(idx_f1, :), 2); 
+            [slope_f2, ~, ~, ~] = fit_linear(x_temp(idx_f2, :), y_temp(idx_f2, :), 2); 
+            [slope_f3, ~, ~, ~] = fit_linear(x_temp(idx_f3, :), y_temp(idx_f3, :), 2); 
+
+            figure;
+            set(gcf, 'Units', 'pixels', 'Position', [100, 100, 1000, 600]); % [x, y, width, height]
+            
+            
+
+            title_f1 = sprintf('Freq %.2fMHz (a=%.2f)', band_ufr(idx_f1), slope_f1);
+            plot(x_temp(idx_f1, :), y_temp(idx_f1, :), 'r.-', 'DisplayName', title_f1 ); 
+            hold on; 
+            title_f2 = sprintf('Freq %.2fMHz (a=%.2f)', band_ufr(idx_f2), slope_f2);
+            plot(x_temp(idx_f2, :), y_temp(idx_f2, :), 'b.-', 'DisplayName', title_f2 ); 
+            title_f3 = sprintf('Freq %.2fMHz (a=%.2f)', band_ufr(idx_f3), slope_f3);
+            plot(x_temp(idx_f2, :), y_temp(idx_f3, :), 'k.-', 'DisplayName', title_f3 ); 
+            hold off; grid on;
+            title(sprintf('Data at ii = %d, jj = %d', ii, jj));
+            xlabel('X_t [cm]'); ylabel('RS_{norm} [dB/MHz]');
+            legend('Location','best')
+            set(gca, 'FontSize', 22)
+        end
+        %%%%%%%%%%%%%%%%%%%%%% PLOT FPR %%%%%%%%%%%%%%%%%%%%%%
+
+        y_vec = y_temp(:);
+
+        a_rfm(ii, jj) = -(X_vec' * X_vec) \ (X_vec' * y_vec);
+        % a_rfm(ii, jj) = - cgs(X_vec' * X_vec, X_vec' * y_vec);
+
+    end
+end
+t = toc;
+fprintf('Loop way Elapsed time %.2f \n', t);
+% RFM
+[m_a, s_a, cv_a] = deal(calc2dStats{1}(a_rfm), calc2dStats{2}(a_rfm), calc2dStats{3}(a_rfm));
+caxis_acs = [0 1.1];
+fontSize = 14;
+
+figure, 
+imagesc(x_ACS * 1e3, z_ACS * 1e3, a_rfm, caxis_acs); % Convert to mm
+axis("image")
+colorbar; colormap("turbo")
+xlabel('Lateral [mm]');
+ylabel('Depth [mm]');
+hb2=colorbar; ylabel(hb2,'dB\cdotcm^{-1}\cdotMHz^{-1}')
+% title('Local Attenuation Coefficient');
+title(sprintf('RFM Local AC (GT= %.2f)\n%.3f $\\pm$ %.3f,  \\%%CV = %.2f', ...
+               alpha_sam, m_a, s_a, cv_a), ...
+      'Interpreter', 'latex');
+set(gca,'fontsize',fontSize)
 
 % Apply constraints to stabilize attenuation estimates
 % a_min = 0.1; % Lower bound for attenuation
 % a_max = 2.0; % Upper bound for attenuation
 % a_local = max(min(a_local, a_max), a_min); % Constrain within bounds
 
+%%
+%%%%%%%%%%%%%%%%%%%% FAST WAY %%%%%%%%%%%%%%%%%%%%
 
+% UFR strategy
+bw_ufr = [3 9];
+freqL = bw_ufr(1); freqH = bw_ufr(2);
+range = bandFull >= freqL & bandFull <= freqH;
+
+RSp_k_ufr   = RSp_k(:,:,range);
+RSp_r_ufr   = RSp_r(:,:,range);
+
+band_ufr    = bandFull(range);
+p_ufr       = length(band_ufr);
+
+% Convert depth values to cm
+z_ACS_cm = z_ACS * 1e2;      % Convert from meters to cm
+z_ACS_r_cm = z_ACS_r * 1e2;  % Convert reference depths to cm
+
+% Delta MHz 
+df_MHz = band_ufr(2) - band_ufr(1);
+
+% Preallocate cell arrays for storing x_temp and y_temp
+x_temp_all = cell(m, n);
+y_temp_all = cell(m, n);
+
+tic;
+for jj = 1:n  % Loop over lateral positions (x_j)
+    for ii = 1:m  % Loop over depth positions (z_k)
+
+        % Temporary storage for this location
+        y_temp = nan(m_r, p_ufr);  % (Reference depth, Frequency) ** m_r
+        x_temp = nan(m_r, p_ufr);  % (Reference depth, Frequency) ** m_r
+
+
+        for r = 1:m_r  % Loop over reference depths
+            % if (ii==1 && r==1)
+            y_col = squeeze( ( log(RSp_k_ufr(ii, jj, :)) - log(RSp_r_ufr(r, jj, :)) ) /(4*df_MHz) *Np2dB ); % p_ufr x 1
+
+            X = z_ACS_cm(ii) - z_ACS_r_cm(r);
+
+            y_temp(r, :) = y_col; %**
+            x_temp(r, :) = X; % **
+
+        end
+        x_temp_all{ii, jj} = x_temp;
+        y_temp_all{ii, jj} = y_temp;
+
+    end
+end
+t = toc;
+fprintf('Loop way Elapsed time %.2f \n', t);
+%%%%%%%%%%%%%%%%%%%% FAST WAY %%%%%%%%%%%%%%%%%%%%
+
+% Prellocate a_local
+a_rfm = zeros(m, n); % Preallocate local attenuation matrix (depth x lateral)
+tic;
+for jj = 1:n  % Loop over lateral positions (x_j)
+    for ii = 1:m  % Loop over depth positions (z_k)
+
+        x_temp = x_temp_all{ii, jj};
+        y_temp = y_temp_all{ii, jj};
+
+        X_vec = x_temp(:);
+
+        % for i = 1:size(y_temp, 2)
+        % 
+        %     y_col = y_temp(:, i);    
+        % 
+        %     %%%%%%%%%%%%%%%% TV Denoising %%%%%%%%%%%%%%%%
+        %     mu = 5;
+        %     tol = 1e-4;
+        % 
+        %     snr1(i) = mean(y_col)/std(y_col);
+        %     [M, N] = size(y_col);
+        %     [y_opt] = IRLS_TV(y_col(:),speye(M*N),mu,M,N,tol,ones(size(M*N)),ones(M*N,1));
+        %     
+        %     y_temp(:, i) = y_opt;
+        % 
+        %     %%%%%%%%%%%%%%%% TV Denoising %%%%%%%%%%%%%%%%
+        % 
+        % end
+        % %
+        %%%%%%%%%%%%%%%%%%%%%% PLOT FPR %%%%%%%%%%%%%%%%%%%%%%
+        if (ii==fix(m/2) && jj==fix(n/6)) || (ii==fix(m/2) && jj==fix(n/2)) || (ii==fix(m/2) && jj==fix(5*n/6)) % different depths
+        % if (jj==fix(n/2) && ii==fix(m/6)) || (jj==fix(n/2) && ii==fix(m/2)) || (jj==fix(n/2) && ii==fix(5*m/6)) % different laterals
+            freq1 = freqL+0.5; freq2 = 0.5*(freqL+freqH); freq3 = freqH-0.5;
+            idx_f1 = find(band_ufr >= freq1, 1, 'first'); idx_f2 = find(band_ufr >= freq2, 1, 'first'); idx_f3 = find(band_ufr >= freq3, 1, 'first');
+            
+
+            [slope_f1, ~, ~, ~] = fit_linear(x_temp(:, idx_f1), y_temp(:, idx_f1), 2); 
+            [slope_f2, ~, ~, ~] = fit_linear(x_temp(:, idx_f2), y_temp(:, idx_f2), 2); 
+            [slope_f3, ~, ~, ~] = fit_linear(x_temp(:, idx_f3), y_temp(:, idx_f3), 2); 
+
+            figure;
+            set(gcf, 'Units', 'pixels', 'Position', [100, 100, 1000, 600]); % [x, y, width, height]          
+
+            title_f1 = sprintf('Freq %.2fMHz (a=%.2f)', band_ufr(idx_f1), slope_f1);
+            plot(x_temp(:, idx_f1), y_temp(:, idx_f1), 'r.-', 'DisplayName', title_f1 ); 
+            hold on; 
+            title_f2 = sprintf('Freq %.2fMHz (a=%.2f)', band_ufr(idx_f2), slope_f2);
+            plot(x_temp(:, idx_f2), y_temp(:, idx_f2), 'b.-', 'DisplayName', title_f2 ); 
+            title_f3 = sprintf('Freq %.2fMHz (a=%.2f)', band_ufr(idx_f3), slope_f3);
+            plot(x_temp(:, idx_f3), y_temp(:, idx_f3), 'k.-', 'DisplayName', title_f3 ); 
+            hold off; grid on;
+            title(sprintf('Data at ii = %d, jj = %d', ii, jj));
+            xlabel('X_t [cm]'); ylabel('RS_{norm} [dB/MHz]');
+            ylim([-20 20]);
+            legend('Location','best')
+            set(gca, 'FontSize', 22)
+        end
+        %%%%%%%%%%%%%%%%%%%%%% PLOT FPR %%%%%%%%%%%%%%%%%%%%%%
+
+        y_vec = y_temp(:);
+
+        a_rfm(ii, jj) = -(X_vec' * X_vec) \ (X_vec' * y_vec);
+        % a_rfm(ii, jj) = - cgs(X_vec' * X_vec, X_vec' * y_vec);
+
+    end
+end
+t = toc;
+fprintf('Loop way Elapsed time %.2f \n', t);
+% RFM
+[m_a, s_a, cv_a] = deal(calc2dStats{1}(a_rfm), calc2dStats{2}(a_rfm), calc2dStats{3}(a_rfm));
+caxis_acs = [0 1.1];
+fontSize = 14;
+
+figure, 
+imagesc(x_ACS * 1e3, z_ACS * 1e3, a_rfm, caxis_acs); % Convert to mm
+axis("image")
+colorbar; colormap("turbo")
+xlabel('Lateral [mm]');
+ylabel('Depth [mm]');
+hb2=colorbar; ylabel(hb2,'dB\cdotcm^{-1}\cdotMHz^{-1}')
+% title('Local Attenuation Coefficient');
+title(sprintf('RFM Local AC (GT= %.2f)\n%.3f $\\pm$ %.3f,  \\%%CV = %.2f', ...
+               alpha_sam, m_a, s_a, cv_a), ...
+      'Interpreter', 'latex');
+set(gca,'fontsize',fontSize)
+
+
+
+
+%%
+keyboard
 %% CLASSICAL SLD  METHOD
 
 % SAMPLE
@@ -434,10 +649,10 @@ title(sprintf('SLD Local AC (GT= %.2f)\n%.3f $\\pm$ %.3f,  \\%%CV = %.2f', ...
 set(gca,'fontsize',fontSize)
 
 % RFM
-[m_a, s_a, cv_a] = deal(calc2dStats{1}(a_local_ufr), calc2dStats{2}(a_local_ufr), calc2dStats{3}(a_local_ufr));
+[m_a, s_a, cv_a] = deal(calc2dStats{1}(a_rfm), calc2dStats{2}(a_rfm), calc2dStats{3}(a_rfm));
 
 subplot(122)
-imagesc(x_ACS * 1e3, z_ACS * 1e3, a_local_ufr, caxis_acs); % Convert to mm
+imagesc(x_ACS * 1e3, z_ACS * 1e3, a_rfm, caxis_acs); % Convert to mm
 axis("image")
 colorbar; colormap("turbo")
 xlabel('Lateral [mm]');
@@ -890,54 +1105,6 @@ text(0.05, 0.95, sprintf('GT ACS = %.2f', gt_acs), ...
     'EdgeColor', 'k', 'HorizontalAlignment', 'left', ...
     'VerticalAlignment', 'top');
 
-%%
-
-y = 0.1*randn(1, 100) + sin(linspace(0, 4*pi, 100)); % Generate noisy signal
-lambda = 0.2;  % Regularization parameter
-x_denoised = tv_denoise(y, lambda, 100);
-
-figure;
-plot(y, 'r'); hold on;
-plot(x_denoised, 'b', 'LineWidth', 2);
-legend('Noisy Signal', 'Denoised Signal');
-title('Total Variation Denoising - 1D');
-
-function x_denoised = tv_denoise(y, lambda, iter)
-    % Implements Chambolle's algorithm for Total Variation Denoising (1D)
-    % 
-    % Inputs:
-    %   y      - Noisy input signal (1D array)
-    %   lambda - Regularization parameter (higher = smoother)
-    %   iter   - Number of iterations (default: 50)
-    %
-    % Output:
-    %   x_denoised - Denoised signal
-    y = y(:);
-    if nargin < 3
-        iter = 50; % Default number of iterations
-    end
-    
-    % Initialize variables
-    x = y; 
-    p = zeros(length(y), 1); % p should be one element smaller than x
-    tau = 0.25;
-
-    for k = 1:iter
-        % Compute divergence (div_p) and update x
-        div_p = [diff(p); 0];  
-        x_new = y - lambda * div_p; 
-        
-        % Update p, making sure dimensions match
-        div_x_nw = [diff(x_new); 0];
-        p = p + tau * div_x_nw;
-        p = p ./ max(1, abs(p)); 
-        
-        % Update x
-        x = x_new;
-    end
-    
-    x_denoised = x;
-end
 
 %%
 pos_range = 1:n;
