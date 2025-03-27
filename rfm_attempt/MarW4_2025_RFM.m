@@ -146,7 +146,6 @@ bandFull  = axis_f*1E-6; % [MHz]
 
 p = length(band);
 
-
 fprintf('\nBandwith: %.2f - %.2f MHz\n',freq_L*1e-6,freq_H*1e-6)
 fprintf('Blocksize in wavelengths: %i\n',blocksize_wv)
 fprintf('Blocksize x: %.2f mm, z: %.2f mm\n',nx*dx*1e3,nz*dz*1e3)
@@ -289,8 +288,8 @@ for jj = 1:n  % Loop over lateral positions (x_j)
     for ii = 1:m  % Loop over depth positions (z_k)
         
         % Temporary storage for this location
-        y_temp = nan(p_ufr, m_r);  % (Frequency, Reference depth)
-        x_temp = nan(p_ufr, m_r);  % (Frequency, Reference depth)
+        y_temp = nan(m_r, p_ufr);  % (Reference depth, Frequency)
+        x_temp = nan(m_r, p_ufr);  % (Reference depth, Frequency)
         
         for iFreq = 1:p_ufr  % Loop over frequency bins
             for r = 1:m_r  % Loop over reference depths
@@ -301,16 +300,14 @@ for jj = 1:n  % Loop over lateral positions (x_j)
                 %     fprintf('ii=%d, jj=%d, r=%d, iFreq=%d \n', ii, jj, r, iFreq); countY = countY +1;
                 % end
                 X = z_ACS_cm(ii) - z_ACS_r_cm(r);
-                if  X == 0
-                    fprintf('ii=%d, jj=%d, r=%d, iFreq=%d \n', ii, jj, r, iFreq); countX = countX +1;
-                end
-
-
+                % if  X == 0
+                %     fprintf('ii=%d, jj=%d, r=%d, iFreq=%d \n', ii, jj, r, iFreq); countX = countX +1;
+                % end
 
                 % Store y and X values in the temporary matrices
 
-                y_temp(iFreq, r) = y;  % (Frequency, Reference depth)
-                x_temp(iFreq, r) = X;  % (Frequency, Reference depth)
+                y_temp(r, iFreq) = y;  % (Frequency, Reference depth)
+                x_temp(r, iFreq) = X;  % (Frequency, Reference depth)
             end
 
             %%%%%%%%%%%%%%%% TV Denoising %%%%%%%%%%%%%%%%
@@ -332,15 +329,14 @@ for jj = 1:n  % Loop over lateral positions (x_j)
             
             figure;
             set(gcf, 'Units', 'pixels', 'Position', [100, 100, 1000, 600]); % [x, y, width, height]
-            
-            
+                       
             title_f1 = sprintf('Freq %.2fMHz (a=%.2f)', band_ufr(idx_f1), band_ufr(idx_f1));
-            plot(x_temp_data(idx_f1, :), y_temp(idx_f1, :), 'r.-', 'DisplayName', title_f1 ); 
+            plot(x_temp_data(:, idx_f1), y_temp(:, idx_f1), 'r.-', 'DisplayName', title_f1 ); 
             hold on; 
             title_f2 = sprintf('Freq %.2fMHz (a=%.2f)', band_ufr(idx_f2), band_ufr(idx_f2));
-            plot(x_temp_data(idx_f2, :), y_temp(idx_f2, :), 'b.-', 'DisplayName', title_f2 ); 
+            plot(x_temp_data(:, idx_f2), y_temp(:, idx_f2), 'b.-', 'DisplayName', title_f2 ); 
             title_f3 = sprintf('Freq %.2fMHz (a=%.2f)', band_ufr(idx_f3), band_ufr(idx_f3));
-            plot(x_temp_data(idx_f2, :), y_temp(idx_f3, :), 'k.-', 'DisplayName', title_f3 ); 
+            plot(x_temp_data(:, idx_f3), y_temp(:, idx_f3), 'k.-', 'DisplayName', title_f3 ); 
             hold off; grid on;
             title(sprintf('Data at ii = %d, jj = %d', ii, jj));
             xlabel('X_t [cm]'); ylabel('RS_{norm} [dB/MHz]');
@@ -355,7 +351,7 @@ end
 t = toc;
 fprintf('Loop way Elapsed time %.2f \n', t);
 
-%% ESTIMATION RFM (OLD FOR P¨RESAVED TV)
+%% ESTIMATION RFM (OLD FOR PRESAVED TV)
 
 % Prellocate a_local
 a_rfm = zeros(m, n); % Preallocate local attenuation matrix (depth x lateral)
@@ -393,16 +389,13 @@ for jj = 1:n  % Loop over lateral positions (x_j)
             freq1 = 3.5; freq2 = 6; freq3 = 8.5;
             idx_f1 = find(band_ufr >= freq1, 1, 'first'); idx_f2 = find(band_ufr >= freq2, 1, 'first'); idx_f3 = find(band_ufr >= freq3, 1, 'first');
             
-
             [slope_f1, ~, ~, ~] = fit_linear(x_temp(idx_f1, :), y_temp(idx_f1, :), 2); 
             [slope_f2, ~, ~, ~] = fit_linear(x_temp(idx_f2, :), y_temp(idx_f2, :), 2); 
             [slope_f3, ~, ~, ~] = fit_linear(x_temp(idx_f3, :), y_temp(idx_f3, :), 2); 
 
             figure;
             set(gcf, 'Units', 'pixels', 'Position', [100, 100, 1000, 600]); % [x, y, width, height]
-            
-            
-
+          
             title_f1 = sprintf('Freq %.2fMHz (a=%.2f)', band_ufr(idx_f1), slope_f1);
             plot(x_temp(idx_f1, :), y_temp(idx_f1, :), 'r.-', 'DisplayName', title_f1 ); 
             hold on; 
@@ -450,7 +443,7 @@ set(gca,'fontsize',fontSize)
 % a_max = 2.0; % Upper bound for attenuation
 % a_local = max(min(a_local, a_max), a_min); % Constrain within bounds
 
-%%
+%% USE THIS FROM APRIL AND NOW ON
 %%%%%%%%%%%%%%%%%%%% FAST WAY %%%%%%%%%%%%%%%%%%%%
 
 % UFR strategy
@@ -483,7 +476,6 @@ for jj = 1:n  % Loop over lateral positions (x_j)
         y_temp = nan(m_r, p_ufr);  % (Reference depth, Frequency) ** m_r
         x_temp = nan(m_r, p_ufr);  % (Reference depth, Frequency) ** m_r
 
-
         for r = 1:m_r  % Loop over reference depths
             % if (ii==1 && r==1)
             y_col = squeeze( ( log(RSp_k_ufr(ii, jj, :)) - log(RSp_r_ufr(r, jj, :)) ) /(4*df_MHz) *Np2dB ); % p_ufr x 1
@@ -503,6 +495,7 @@ t = toc;
 fprintf('Loop way Elapsed time %.2f \n', t);
 %%%%%%%%%%%%%%%%%%%% FAST WAY %%%%%%%%%%%%%%%%%%%%
 
+%% NOW ESTIMATE
 % Prellocate a_local
 a_rfm = zeros(m, n); % Preallocate local attenuation matrix (depth x lateral)
 tic;
@@ -514,6 +507,7 @@ for jj = 1:n  % Loop over lateral positions (x_j)
 
         X_vec = x_temp(:);
 
+        %%%%%%%%%%%%%%%%%%%%% TV DENOISING PER CHANNEL %%%%%%%%%%%%%%%%%%%%%
         % for i = 1:size(y_temp, 2)
         % 
         %     y_col = y_temp(:, i);    
@@ -531,7 +525,19 @@ for jj = 1:n  % Loop over lateral positions (x_j)
         %     %%%%%%%%%%%%%%%% TV Denoising %%%%%%%%%%%%%%%%
         % 
         % end
-        % %
+        % 
+        %%%%%%%%%%%%%%%%%%%%% TV DENOISING PER CHANNEL %%%%%%%%%%%%%%%%%%%%%
+
+        %%%%%%%%%%%%%%%%%%%%% TNV DENOISING JOINT %%%%%%%%%%%%%%%%%%%%%
+        lambda   = 1;  % Regularization parameter
+        max_iter = 20;
+        tol = 2e-3;
+        [y_denoised, cost1, err1, fid1, reg1, iter1] = TNV_regularization(y_temp, ...
+            lambda, max_iter, tol);
+        y_temp = y_denoised;
+        %%%%%%%%%%%%%%%%%%%%% TNV DENOISING JOINT %%%%%%%%%%%%%%%%%%%%%
+
+
         %%%%%%%%%%%%%%%%%%%%%% PLOT FPR %%%%%%%%%%%%%%%%%%%%%%
         if (ii==fix(m/2) && jj==fix(n/6)) || (ii==fix(m/2) && jj==fix(n/2)) || (ii==fix(m/2) && jj==fix(5*n/6)) % different depths
         % if (jj==fix(n/2) && ii==fix(m/6)) || (jj==fix(n/2) && ii==fix(m/2)) || (jj==fix(n/2) && ii==fix(5*m/6)) % different laterals
