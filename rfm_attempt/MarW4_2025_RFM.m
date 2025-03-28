@@ -62,7 +62,6 @@ pars.saran_layer = false;
 pars.ratio_zx    = 1.25;
 pars.window_type = 3; %  (1) Hanning, (2) Tuckey, (3) Hamming, (4) Tchebychev
 
-
 blocksize_wv_r = 12;
 %% RFM V1 
 % Reading experiment settings parameters
@@ -144,8 +143,8 @@ freq_H = bw(2)*1E6; % [Hz]
 
 ind_f = axis_f >= freq_L & axis_f <= freq_H ;   
 
-band  = axis_f(ind_f)*1E-6; % [MHz]
-bandFull  = axis_f*1E-6; % [MHz]
+band     = axis_f(ind_f)*1E-6; % [MHz]
+bandFull = axis_f*1E-6; % [MHz]
 
 p = length(band);
 
@@ -261,191 +260,6 @@ RSp_r(:,:, 2:end) = Sp_r(:,:, 2:end) ./ Sp_r(:,:, 1:end-1); clear Sp_r
 % For the first slice, keep the ratio the same as the first slice
 RSp_r(:,:, 1) = RSp_r(:,:, 2); % Assuming the first slice ratios are 1 as there is no "i-1"
 
-%% ATTEMPT RFM A_local UFR
-
-% UFR strategy
-bw_ufr = [3 9];
-freqL = bw_ufr(1); freqH = bw_ufr(2);
-range = bandFull >= freqL & bandFull <= freqH;
-
-RSp_k_ufr   = RSp_k(:,:,range);
-RSp_r_ufr   = RSp_r(:,:,range);
-
-band_ufr    = bandFull(range);
-p_ufr       = length(band_ufr);
-
-% Convert depth values to cm
-z_ACS_cm = z_ACS * 1e2;      % Convert from meters to cm
-z_ACS_r_cm = z_ACS_r * 1e2;  % Convert reference depths to cm
-
-% Delta MHz 
-df_MHz = band_ufr(2) - band_ufr(1);
-
-% Preallocate cell arrays for storing x_temp and y_temp
-x_temp_all = cell(m, n);
-y_temp_all = cell(m, n);
-
-countX = 0; countY = 0;
-tic;
-for jj = 1:n  % Loop over lateral positions (x_j)
-    for ii = 1:m  % Loop over depth positions (z_k)
-        
-        % Temporary storage for this location
-        y_temp = nan(m_r, p_ufr);  % (Reference depth, Frequency)
-        x_temp = nan(m_r, p_ufr);  % (Reference depth, Frequency)
-        
-        for iFreq = 1:p_ufr  % Loop over frequency bins
-            for r = 1:m_r  % Loop over reference depths
-
-                % WAY WITH UNITS
-                y = ( log(RSp_k_ufr(ii, jj, iFreq)) - log(RSp_r_ufr(r, jj, iFreq)) ) / (4*df_MHz)*Np2dB;
-                % if  y == 0
-                %     fprintf('ii=%d, jj=%d, r=%d, iFreq=%d \n', ii, jj, r, iFreq); countY = countY +1;
-                % end
-                X = z_ACS_cm(ii) - z_ACS_r_cm(r);
-                % if  X == 0
-                %     fprintf('ii=%d, jj=%d, r=%d, iFreq=%d \n', ii, jj, r, iFreq); countX = countX +1;
-                % end
-
-                % Store y and X values in the temporary matrices
-
-                y_temp(r, iFreq) = y;  % (Frequency, Reference depth)
-                x_temp(r, iFreq) = X;  % (Frequency, Reference depth)
-            end
-
-            %%%%%%%%%%%%%%%% TV Denoising %%%%%%%%%%%%%%%%
-            % mu = 5;
-            % tol = 1e-4;
-            % y_og = y_temp(iFreq, :); 
-            % % snr1(i) = mean(Y_row)/std(Y_row);
-            % [M, N] = size(y_og(:));
-            % [y_opt] = IRLS_TV(y_og(:),speye(M*N),mu, M,N,tol,ones(size(M*N)),ones(M*N,1));
-            % y_temp(iFreq, :) = y_opt';
-            %%%%%%%%%%%%%%%% TV Denoising %%%%%%%%%%%%%%%%
-        end
-        
-        %%%%%%%%%%%%%%%%%%%%%% PLOT FPR %%%%%%%%%%%%%%%%%%%%%%
-        % if (ii==fix(m/2) && jj==fix(n/6)) || (ii==fix(m/2) && jj==fix(n/2)) || (ii==fix(m/2) && jj==fix(5*n/6)) % different depths
-        if (jj==fix(n/2) && ii==fix(m/6)) || (jj==fix(n/2) && ii==fix(m/2)) || (jj==fix(n/2) && ii==fix(5*m/6)) % different laterals
-            freq1 = 3.5; freq2 = 6; freq3 = 8.5;
-            idx_f1 = find(band_ufr >= freq1, 1, 'first'); idx_f2 = find(band_ufr >= freq2, 1, 'first'); idx_f3 = find(band_ufr >= freq3, 1, 'first');
-            
-            figure;
-            set(gcf, 'Units', 'pixels', 'Position', [100, 100, 1000, 600]); % [x, y, width, height]
-                       
-            title_f1 = sprintf('Freq %.2fMHz (a=%.2f)', band_ufr(idx_f1), band_ufr(idx_f1));
-            plot(x_temp_data(:, idx_f1), y_temp(:, idx_f1), 'r.-', 'DisplayName', title_f1 ); 
-            hold on; 
-            title_f2 = sprintf('Freq %.2fMHz (a=%.2f)', band_ufr(idx_f2), band_ufr(idx_f2));
-            plot(x_temp_data(:, idx_f2), y_temp(:, idx_f2), 'b.-', 'DisplayName', title_f2 ); 
-            title_f3 = sprintf('Freq %.2fMHz (a=%.2f)', band_ufr(idx_f3), band_ufr(idx_f3));
-            plot(x_temp_data(:, idx_f3), y_temp(:, idx_f3), 'k.-', 'DisplayName', title_f3 ); 
-            hold off; grid on;
-            title(sprintf('Data at ii = %d, jj = %d', ii, jj));
-            xlabel('X_t [cm]'); ylabel('RS_{norm} [dB/MHz]');
-            legend('Location','best')
-        end
-        %%%%%%%%%%%%%%%%%%%%%% PLOT FPR %%%%%%%%%%%%%%%%%%%%%%
-        x_temp_all{ii, jj} = x_temp;
-        y_temp_all{ii, jj} = y_temp;
-
-    end
-end
-t = toc;
-fprintf('Loop way Elapsed time %.2f \n', t);
-
-%% ESTIMATION RFM (OLD FOR PRESAVED TV)
-
-% Prellocate a_local
-a_rfm = zeros(m, n); % Preallocate local attenuation matrix (depth x lateral)
-tic;
-for jj = 1:n  % Loop over lateral positions (x_j)
-    for ii = 1:m  % Loop over depth positions (z_k)
-
-        x_temp = x_temp_all{ii, jj};
-        y_temp = y_temp_all{ii, jj};
-
-        X_vec = x_temp(:);
-
-        % for i = 1:size(y_temp_data, 1)
-        % 
-        %     Y_row = y_temp_data(i, :);    
-        % 
-        %     %%%%%%%%%%%%%%%% TV Denoising %%%%%%%%%%%%%%%%
-        %     mu = 5;
-        %     tol = 1e-4;
-        % 
-        %     snr1(i) = mean(Y_row)/std(Y_row);
-        %     [M, N] = size(Y_row(:));
-        %     [y_opt] = IRLS_TV(Y_row(:),speye(M*N),mu,M,N,tol,ones(size(M*N)),ones(M*N,1));
-        %     Y_row = y_opt';
-        %     y_temp_data(i, :) = Y_row;
-        % 
-        %     %%%%%%%%%%%%%%%% TV Denoising %%%%%%%%%%%%%%%%
-        % 
-        % end
-        % %
-
-        %%%%%%%%%%%%%%%%%%%%%% PLOT FPR %%%%%%%%%%%%%%%%%%%%%%
-        if (ii==fix(m/2) && jj==fix(n/6)) || (ii==fix(m/2) && jj==fix(n/2)) || (ii==fix(m/2) && jj==fix(5*n/6)) % different depths
-        % if (jj==fix(n/2) && ii==fix(m/6)) || (jj==fix(n/2) && ii==fix(m/2)) || (jj==fix(n/2) && ii==fix(5*m/6)) % different laterals
-            freq1 = 3.5; freq2 = 6; freq3 = 8.5;
-            idx_f1 = find(band_ufr >= freq1, 1, 'first'); idx_f2 = find(band_ufr >= freq2, 1, 'first'); idx_f3 = find(band_ufr >= freq3, 1, 'first');
-            
-            [slope_f1, ~, ~, ~] = fit_linear(x_temp(idx_f1, :), y_temp(idx_f1, :), 2); 
-            [slope_f2, ~, ~, ~] = fit_linear(x_temp(idx_f2, :), y_temp(idx_f2, :), 2); 
-            [slope_f3, ~, ~, ~] = fit_linear(x_temp(idx_f3, :), y_temp(idx_f3, :), 2); 
-
-            figure;
-            set(gcf, 'Units', 'pixels', 'Position', [100, 100, 1000, 600]); % [x, y, width, height]
-          
-            title_f1 = sprintf('Freq %.2fMHz (a=%.2f)', band_ufr(idx_f1), slope_f1);
-            plot(x_temp(idx_f1, :), y_temp(idx_f1, :), 'r.-', 'DisplayName', title_f1 ); 
-            hold on; 
-            title_f2 = sprintf('Freq %.2fMHz (a=%.2f)', band_ufr(idx_f2), slope_f2);
-            plot(x_temp(idx_f2, :), y_temp(idx_f2, :), 'b.-', 'DisplayName', title_f2 ); 
-            title_f3 = sprintf('Freq %.2fMHz (a=%.2f)', band_ufr(idx_f3), slope_f3);
-            plot(x_temp(idx_f2, :), y_temp(idx_f3, :), 'k.-', 'DisplayName', title_f3 ); 
-            hold off; grid on;
-            title(sprintf('Data at ii = %d, jj = %d', ii, jj));
-            xlabel('X_t [cm]'); ylabel('RS_{norm} [dB/MHz]');
-            legend('Location','best')
-            set(gca, 'FontSize', 22)
-        end
-        %%%%%%%%%%%%%%%%%%%%%% PLOT FPR %%%%%%%%%%%%%%%%%%%%%%
-
-        y_vec = y_temp(:);
-
-        a_rfm(ii, jj) = -(X_vec' * X_vec) \ (X_vec' * y_vec);
-        % a_rfm(ii, jj) = - cgs(X_vec' * X_vec, X_vec' * y_vec);
-
-    end
-end
-t = toc;
-fprintf('Loop way Elapsed time %.2f \n', t);
-% RFM
-[m_a, s_a, cv_a] = deal(calc2dStats{1}(a_rfm), calc2dStats{2}(a_rfm), calc2dStats{3}(a_rfm));
-caxis_acs = [0 1.1];
-fontSize = 14;
-
-figure, 
-imagesc(x_ACS * 1e3, z_ACS * 1e3, a_rfm, caxis_acs); % Convert to mm
-axis("image")
-colorbar; colormap("turbo")
-xlabel('Lateral [mm]');
-ylabel('Depth [mm]');
-hb2=colorbar; ylabel(hb2,'dB\cdotcm^{-1}\cdotMHz^{-1}')
-% title('Local Attenuation Coefficient');
-title(sprintf('RFM Local AC (GT= %.2f)\n%.3f $\\pm$ %.3f,  \\%%CV = %.2f', ...
-               alpha_sam, m_a, s_a, cv_a), ...
-      'Interpreter', 'latex');
-set(gca,'fontsize',fontSize)
-
-% Apply constraints to stabilize attenuation estimates
-% a_min = 0.1; % Lower bound for attenuation
-% a_max = 2.0; % Upper bound for attenuation
-% a_local = max(min(a_local, a_max), a_min); % Constrain within bounds
-
 %% USE THIS FROM APRIL AND NOW ON
 %%%%%%%%%%%%%%%%%%%% FAST WAY %%%%%%%%%%%%%%%%%%%%
 
@@ -512,23 +326,16 @@ for jj = 1:n  % Loop over lateral positions (x_j)
 
         %%%%%%%%%%%%%%%%%%%%% TV DENOISING PER CHANNEL %%%%%%%%%%%%%%%%%%%%%
         % for i = 1:size(y_temp, 2)
-        % 
         %     y_col = y_temp(:, i);    
-        % 
         %     %%%%%%%%%%%%%%%% TV Denoising %%%%%%%%%%%%%%%%
         %     mu = 5;
         %     tol = 1e-4;
-        % 
         %     snr1(i) = mean(y_col)/std(y_col);
         %     [M, N] = size(y_col);
-        %     [y_opt] = IRLS_TV(y_col(:),speye(M*N),mu,M,N,tol,ones(size(M*N)),ones(M*N,1));
-        %     
+        %     [y_opt] = IRLS_TV(y_col(:),speye(M*N),mu,M,N,tol,ones(size(M*N)),ones(M*N,1));    
         %     y_temp(:, i) = y_opt;
-        % 
         %     %%%%%%%%%%%%%%%% TV Denoising %%%%%%%%%%%%%%%%
-        % 
-        % end
-        % 
+        % end 
         %%%%%%%%%%%%%%%%%%%%% TV DENOISING PER CHANNEL %%%%%%%%%%%%%%%%%%%%%
 
         %%%%%%%%%%%%%%%%%%%%% TNV DENOISING JOINT %%%%%%%%%%%%%%%%%%%%%
@@ -597,8 +404,6 @@ title(sprintf('RFM Local AC (GT= %.2f)\n%.3f $\\pm$ %.3f,  \\%%CV = %.2f', ...
                alpha_sam, m_a, s_a, cv_a), ...
       'Interpreter', 'latex');
 set(gca,'fontsize',fontSize)
-
-
 
 
 %%
@@ -674,7 +479,6 @@ title(sprintf('RFM Local AC (GT= %.2f)\n%.3f $\\pm$ %.3f,  \\%%CV = %.2f', ...
 set(gca,'fontsize',fontSize)
 
 
-
 %%
 keyboard
 
@@ -719,7 +523,7 @@ df_MHz = min(diff(band));
 FPR_all     = zeros(length(z_ACS_cm), n, p); % Store original FPR
 FPR_fit_all = zeros(length(z_ACS_cm), n, p); % Store linear fit (lin_y)
 slopes_all  = zeros(n, p); % Store slope values
-ACS_RFM     = zeros(p, n); 
+ATOT_RFM     = zeros(p, n); 
 for ff = 1:p 
     for jj = 1:n
         % Compute FPR
@@ -735,8 +539,8 @@ for ff = 1:p
         slopes_all(jj, ff) = lin_slope;
         
         % Store ACS value
-        % ACS_RFM(ff, jj) = -lin_slope; % -8.68*m/(4*delta_f) [dB/MHz/cm]
-        ACS_RFM(ff, jj) = +lin_slope; % -8.68*m/(4*delta_f) [dB/MHz/cm]
+        % ATOT_RFM(ff, jj) = -lin_slope; % -8.68*m/(4*delta_f) [dB/MHz/cm]
+        ATOT_RFM(ff, jj) = +lin_slope; % -8.68*m/(4*delta_f) [dB/MHz/cm]
     end
 end
 
@@ -744,7 +548,7 @@ end
 % RESULTS IMAGESC
 acs_range = [-1.2 1.2];
 figure, 
-imagesc(x_ACS*1E2, band, ACS_RFM, acs_range), colorbar
+imagesc(x_ACS*1E2, band, ATOT_RFM, acs_range), colorbar
 % hb2=colorbar; ylabel(hb2,'dB/cm/MHz')
 hb2=colorbar; ylabel(hb2,'dB\cdotcm^{-1}\cdotMHz^{-1}')
 xlabel('Lateral [cm]')
@@ -752,7 +556,7 @@ ylabel('Freq [MHz]')
 
 acs_range = [0 1.2];
 figure, 
-imagesc(x_ACS*1E2, band, abs(ACS_RFM), acs_range), colorbar
+imagesc(x_ACS*1E2, band, abs(ATOT_RFM), acs_range), colorbar
 colormap("turbo")
 % hb2=colorbar; ylabel(hb2,'dB/cm/MHz')
 hb2=colorbar; ylabel(hb2,'dB\cdotcm^{-1}\cdotMHz^{-1}')
@@ -765,12 +569,12 @@ idx_f2 = find(band >= freq2, 1, 'first');
 idx_f3 = find(band >= freq3, 1, 'first');
 
 figure, 
-plot(x_ACS', ACS_RFM(idx_f1,:), 'r'), hold on
-plot(x_ACS', ACS_RFM(idx_f2,:), 'g'), hold on
-plot(x_ACS', ACS_RFM(idx_f3,:), 'b'), hold on
+plot(x_ACS', ATOT_RFM(idx_f1,:), 'r'), hold on
+plot(x_ACS', ATOT_RFM(idx_f2,:), 'g'), hold on
+plot(x_ACS', ATOT_RFM(idx_f3,:), 'b'), hold on
 yline(SAM.alpha_value, 'k--')
 
-f_vs_acs= mean((ACS_RFM), 2);
+f_vs_acs= mean((ATOT_RFM), 2);
 figure, 
 plot(band, f_vs_acs)
 yline(mean(f_vs_acs), 'b-')
@@ -844,7 +648,7 @@ set(gca, 'FontSize', 14)
 %% HISTOGRAM
 
 % figure;
-% histogram(ACS_RFM, 20, 'Normalization', 'probability'); % 20 bins
+% histogram(ATOT_RFM, 20, 'Normalization', 'probability'); % 20 bins
 % xlabel('Value');
 % ylabel('Frequency');
 % title('Histogram of ACS Elements');
@@ -853,13 +657,13 @@ set(gca, 'FontSize', 14)
 %% BOX PLOT RESULTS RFM
 
 % Compute mean and standard deviation
-mu      = mean(ACS_RFM(:));
-sigma   = std(ACS_RFM(:));
+mu      = mean(ATOT_RFM(:));
+sigma   = std(ATOT_RFM(:));
 cv      = sigma/mu;
 
 % Generate the box plot
 figure;
-boxplot(ACS_RFM(:)); 
+boxplot(ATOT_RFM(:)); 
 grid on;
 yline(gt_acs, 'k--', 'LineWidth', 1.5); % Dashed line for GT ACS
 ylim([-5 5]);
@@ -960,10 +764,10 @@ cv      = sigma/mu;
 %% BOX PLOTS ALL
 
 % Find the maximum number of rows among the arrays
-maxLength  = max([length(ACS_RFM(:)), length(ACS_SLD(:)), length(ACS_RSLD(:))]);
+maxLength  = max([length(ATOT_RFM(:)), length(ACS_SLD(:)), length(ACS_RSLD(:))]);
 
 % Pad each array with NaNs to match the maximum number of rows
-ACS_RFM_padded  = [ACS_RFM(:); NaN(maxLength - length(ACS_RFM(:)), 1)];
+ACS_RFM_padded  = [ATT_RFM(:); NaN(maxLength - length(ATT_RFM(:)), 1)];
 ACS_SLD_padded  = [ACS_SLD(:); NaN(maxLength - length(ACS_SLD(:)), 1)];
 ACS_RSLD_padded = [ACS_RSLD(:); NaN(maxLength - length(ACS_RSLD(:)), 1)];
 
@@ -1008,7 +812,7 @@ FPR_fit_all = zeros(length(z_ACS_cm), n, p); % Store linear fit (lin_y)
 
 slopes_all = zeros(p, n); % Store slope values
 FPR_snr_all = zeros(p, n); % Store standard deviation of FPR 
-ACS_RFM = zeros(p, n);
+ATT_RFM = zeros(p, n);
 
 for ff = 1:p 
     for jj = 1:n
@@ -1031,7 +835,7 @@ for ff = 1:p
         slopes_all(ff, jj) = lin_slope;
         
         % Store ACS value
-        ACS_RFM(ff, jj) = -lin_slope; % -8.68*m/(4*delta_f) [dB/MHz/cm]
+        ATT_RFM(ff, jj) = -lin_slope; % -8.68*m/(4*delta_f) [dB/MHz/cm]
 
         % std
         FPR_snr_all(ff, jj) = mean(FPR)/std(FPR);
@@ -1089,13 +893,13 @@ set(gca, 'FontSize', 14)
 % BOX PLOT RESULTS RFM
 
 % Compute mean and standard deviation
-mu      = mean(ACS_RFM(:));
-sigma   = std(ACS_RFM(:));
+mu      = mean(ATT_RFM(:));
+sigma   = std(ATT_RFM(:));
 cv      = sigma/mu;
 
 % Generate the box plot
 figure;
-boxplot(ACS_RFM(:)); 
+boxplot(ATT_RFM(:)); 
 grid on;
 yline(gt_acs, 'k--', 'LineWidth', 1.5); % Dashed line for GT ACS
 ylim([-5 5]);

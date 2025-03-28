@@ -51,12 +51,12 @@ function simuMultiPurpose(alpha_value, numSim, nameFolderOut, typeSimu)
 % srun --ntasks=1 --nodes=1 matlab -nosplash -nodesktop -nodisplay -r "c=parcluster('local'); numWorkers=min(c.NumWorkers, feature('numcores')); maxNumCompThreads(numWorkers); delete(gcp('nocreate')); parpool('local', numWorkers); simuMultiPurpose($matlab_args); exit;"
 
 
-% cd('../'); % when you run it usually goes inside ./codes/script.m
+cd('../'); % when you run it usually goes inside ./codes/script.m
 addpath(genpath(pwd))
 addpath(genpath('/opt/MATLAB Add-Ons'))
 
 list_rho_mean = [1000 1000 1000 1000 1000];
-list_rho_std = [0.01 0.02 0.03 0.04 0.05];
+list_rho_std  = [0.01 0.02 0.03 0.04 0.05];
 % list_rho_std = [0.01 0.02 0.03 0.04 0.05];
 
 OutputDir = fullfile(pwd, 'out', nameFolderOut);

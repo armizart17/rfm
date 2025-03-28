@@ -198,9 +198,9 @@ legend('Location', 'best')
 % Parameters
 num_points      = 100;         % Number of points in each column (x-axis samples)
 num_cols        = 50;          % Number of columns (different intercepts)
-slope           = 2;                 % Desired slope of the linear function
-intercept_range = [-5, 5];  % Range of intercepts (randomly chosen for each column)
-noise_level     = 1.5;          % Noise standard deviation
+slope           = 2;           % Desired slope of the linear function
+intercept_range = [-5, 5];     % Range of intercepts (randomly chosen for each column)
+noise_level     = 1.5;         % Noise standard deviation
 
 x = linspace(0, 10, num_points)';  % x-axis (column vector)
 % x_array = x*ones(1, num_points);
