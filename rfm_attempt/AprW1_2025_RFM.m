@@ -414,10 +414,11 @@ fileNameOut = "tnv_a"+alpha_sam +".mat";
 save(fullfile(outDir, fileNameOut),"a_rfm_tnv1", "a_rfm_tnv2", ...
     "MetricsParam", "mu_range");
 
+
 %%
+keyboard
 
-
-
+%%
 % RFM
 [m_a, s_a, cv_a] = deal(calc2dStats{1}(a_rfm), calc2dStats{2}(a_rfm), calc2dStats{3}(a_rfm));
 caxis_acs = [0 1.1];
@@ -510,8 +511,6 @@ title(sprintf('RFM Local AC (GT= %.2f)\n%.3f $\\pm$ %.3f,  \\%%CV = %.2f', ...
 set(gca,'fontsize',fontSize)
 
 
-%%
-keyboard
 
 
 %% IMOVERLAY SIMPLE
