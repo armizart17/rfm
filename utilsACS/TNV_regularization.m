@@ -54,16 +54,17 @@ function [y_denoised, cost, err, fid, reg, iter] = TNV_regularization(y_array, l
             break;
         end
         
-        figure(18), 
-        plot(y_new(:,1:10:50), 'LineWidth', 1);
-        title(['TNV v1 Iter: ', num2str(iter)]);
-        xlabel('x-axis');
-        ylabel('y-axis');
-        ylim([-5 25]);
-        grid on;
+        % figure(18), 
+        % plot(y_new(:,1:10:50), 'LineWidth', 1);
+        % title(['TNV v1 Iter: ', num2str(iter)]);
+        % xlabel('x-axis');
+        % ylabel('y-axis');
+        % ylim([-5 25]);
+        % grid on;
+        % pause(0.01)
         % Update the denoised matrix
         y_denoised = y_new;
-        pause(0.01)
+      
     end
     
     fprintf('TNV Regularization completed in %d iterations\n', iter);
