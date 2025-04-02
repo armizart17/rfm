@@ -254,6 +254,8 @@ RSp_k(:,:, 2:end) = Sp_k(:,:, 2:end) ./ Sp_k(:,:, 1:end-1);
 % For the first slice, keep the ratio the same as the first slice
 RSp_k(:,:, 1) = RSp_k(:,:, 2); % Assuming the first slice ratios are 1 as there is no "i-1"
 
+RSp_k = log(RSp_k); % @@
+
 %% Reference Depth
 
 % blocksize_wv_r = blocksize_wv *2;
@@ -318,10 +320,13 @@ RSp_r(:,:, 2:end) = Sp_r(:,:, 2:end) ./ Sp_r(:,:, 1:end-1);
 % For the first slice, keep the ratio the same as the first slice
 RSp_r(:,:, 1) = RSp_r(:,:, 2); % Assuming the first slice ratios are 1 as there is no "i-1"
 
-%% ATTEMPT RFM A_local UFR
+RSp_r = log(RSp_r); % @@
+%% USE THIS FROM APRIL AND NOW ON
+%%%%%%%%%%%%%%%%%%%% FAST WAY %%%%%%%%%%%%%%%%%%%%
 
 % UFR strategy
-freqL = 3; freqH = 9;
+bw_ufr = [3 9];
+freqL = bw_ufr(1); freqH = bw_ufr(2);
 range = bandFull >= freqL & bandFull <= freqH;
 
 RSp_k_ufr   = RSp_k(:,:,range);
@@ -330,45 +335,157 @@ RSp_r_ufr   = RSp_r(:,:,range);
 band_ufr    = bandFull(range);
 p_ufr       = length(band_ufr);
 
+%
+% DENOISING TNV RSP
+mu          = 1;
+tau         = 0.01;
+maxIter     = 1000;
+stableIter  = 20;
+% tol         = 0.5e-4; % tolerance error
+tol         = 1e-3; % tolerance error
+RSp_k_ufr_vec = reshape(RSp_k_ufr, [], size(RSp_k_ufr, 3));   
+mux_RSp = 1./(abs(mean(RSp_k_ufr_vec, 1, 'omitnan')) ./ std(RSp_k_ufr_vec, 0, 1, 'omitnan') + 1E-5);
+% weigthChannels = rescale(mux_RSp, 1, 10);
+% weigthChannels = mux_RSp;
+weigthChannels = ones(1, p_ufr);
+
+% gamma = 1;
+% vec_gamma = 1 + (2 - 1) * (1 - linspace(0, 1, p_ufr).^gamma);
+% vec_log = logspace(log10(10), log10(1), p_ufr);
+% weigthChannels = vec_gamma;
+
+figure, plot(weigthChannels)
+
+[RSp_k_ufr_opt, cost, error, fid, reg] = pdo_den_wtnv(RSp_k_ufr, mu, tau, maxIter, tol, stableIter, weigthChannels);
+
+[RSp_r_ufr_opt, cost, error, fid, reg] = pdo_den_wtnv(RSp_r_ufr, mu, tau, maxIter, tol, stableIter, weigthChannels);
+
+RSp_k_ufr = RSp_k_ufr_opt;
+RSp_r_ufr = RSp_r_ufr_opt;
+%%
 % Convert depth values to cm
 z_ACS_cm = z_ACS * 1e2;      % Convert from meters to cm
 z_ACS_r_cm = z_ACS_r * 1e2;  % Convert reference depths to cm
 
-a_local_ufr = zeros(m, n); % Preallocate local attenuation matrix (depth x lateral)
+% Delta MHz 
+df_MHz = band_ufr(2) - band_ufr(1);
+
+% Preallocate cell arrays for storing x_temp and y_temp
+x_temp_all = cell(m, n);
+y_temp_all = cell(m, n);
 
 tic;
 for jj = 1:n  % Loop over lateral positions (x_j)
     for ii = 1:m  % Loop over depth positions (z_k)
-        
-        y_vec = []; % Initialize y vector for this location
-        X_mat = []; % Initialize X matrix for this location
-        
+
+        % Temporary storage for this location
+        y_temp = nan(m_r, p_ufr);  % (Reference depth, Frequency) ** m_r
+        x_temp = nan(m_r, p_ufr);  % (Reference depth, Frequency) ** m_r
+
         for r = 1:m_r  % Loop over reference depths
-            for i = 2:p_ufr  % Loop over frequency bins
-                % Compute y = log(RSnorm) at this depth & lateral position
-                y = log(RSp_k_ufr(ii, jj, i)) - log(RSp_r_ufr(r, jj, i));
-                
-                % Define X = -4 * (fi - fi-1) * (zk - zr)
-                X = -4 * (band_ufr(i) - band_ufr(i-1)) * (z_ACS_cm(ii) - z_ACS_r_cm(r)) /Np2dB;
+            % if (ii==1 && r==1)
+            % y_col = squeeze( ( log(RSp_k_ufr(ii, jj, :)) - log(RSp_r_ufr(r, jj, :)) ) /(4*df_MHz) *Np2dB ); % p_ufr x 1
+            y_col = squeeze( ( (RSp_k_ufr(ii, jj, :)) - (RSp_r_ufr(r, jj, :)) ) /(4*df_MHz) *Np2dB ); %@@ p_ufr x 1
 
-                % Store values for least squares regression
-                y_vec = [y_vec; y(:)];
-                X_mat = [X_mat; X];
-            end
-        end
+            X = z_ACS_cm(ii) - z_ACS_r_cm(r);
 
-        % Solve for local attenuation a(z_k, x_j) using least squares
-        if ~isempty(y_vec)
-            a_local_ufr(ii, jj) =  (X_mat' * X_mat) \ (X_mat' * y_vec)  ;
+            y_temp(r, :) = y_col; %**
+            x_temp(r, :) = X; % **
+
         end
+        x_temp_all{ii, jj} = x_temp;
+        y_temp_all{ii, jj} = y_temp;
+
     end
 end
 t = toc;
 fprintf('Loop way Elapsed time %.2f \n', t);
+%%%%%%%%%%%%%%%%%%%% FAST WAY %%%%%%%%%%%%%%%%%%%%
 
+%% NOW ESTIMATION 
+
+[XX_ACS,ZZ_ACS] = meshgrid(x_ACS, z_ACS);
+[Xq,Zq] = meshgrid(x,z);
+
+% Preallocate local attenuation matrix (depth x lateral)
+a_rfm1 = zeros(m, n); 
+a_rfm2 = zeros(m, n);
+
+% REG
+% mu_range = 10.^(0.1:0.05:1);
+
+% mu_range = 10.^(0.1:0.25:1);
+mu_range = 2.2;
+
+
+% TNV v1
+maxIter1 = 20;
+tol1 = 2e-3;
+
+% TNV2 
+weights2 = ones(length(band_ufr), 1);
+tau2 = 0.01;
+maxIter2 = 300;
+tol2 = 0.5e-3;
+stableIter2 = 10;
+
+% PRELOCATE A MAPS FOR MU_REF
+a_rfm_tnv1 = zeros(m,n, length(mu_range));
+a_rfm = zeros(m,n);
+
+tnv_fpr = false;
+
+for uu = 1:length(mu_range)
+lambda = mu_range(uu);
+
+tic;
+for jj = 1:n  % Loop over lateral positions (x_j)
+    for ii = 1:m  % Loop over depth positions (z_k)
+
+        x_temp = x_temp_all{ii, jj};
+        y_temp = y_temp_all{ii, jj};
+
+        X_vec = x_temp(:);
+        y_vec = y_temp(:);
+        %%%%%%%%%%%%%%%%%%%%% TNV DENOISING JOINT 2 %%%%%%%%%%%%%%%%%%%%%
+        if (tnv_fpr)
+        [y_denoised2, cost2, err2, fid2, reg2] = pdo_den_wtnv_1d(y_temp, ...
+            lambda, tau2, maxIter2, tol2, stableIter2, weights2);
+
+        y_temp2 = y_denoised2;
+
+        y_vec = y_temp2(:);
+        end
+        %%%%%%%%%%%%%%%%%%%%% TNV DENOISING JOINT 2 %%%%%%%%%%%%%%%%%%%%%
+ 
+        a_rfm(ii, jj) = -(X_vec' * X_vec) \ (X_vec' * y_vec);
+
+    end
+end
+t = toc;
+fprintf('Loop way for mu = %.2f, Elapsed time %.2f \n', lambda, t);
+
+
+% SAVE MAP
+a_rfm_tnv1(:,:,uu) = a_rfm;
+
+
+% BIGGER
+AttInterp1 = interp2(XX_ACS,ZZ_ACS, a_rfm, Xq,Zq);
+% AttInterp1 = bigImg(a_rfm, rfdata_sam_roi); %less std and rmse
+
+
+% METRICS
+r1  = get_metrics_homo_gt(AttInterp1, true(size(AttInterp1)), alpha_sam, 'RFM-TNV1');
+r1.mu = lambda;
+
+MetricsParam(uu)   = r1; 
+
+end
+keyboard
 %% FIGURES v1 RFM
 
-ACS_RFM = a_local_ufr;
+ACS_RFM = a_rfm;
 fontSize = 20;
 
 figure, 
@@ -386,7 +503,7 @@ xlabel('Lateral [mm]');
 ylabel('Depth [mm]');
 hb2=colorbar; ylabel(hb2,'dB\cdotcm^{-1}\cdotMHz^{-1}')
 % title('Local Attenuation Coefficient');
-title(sprintf('RFM Local AC (GT= %.2f)\n%.3f $\\pm$ %.3f,  \\%%CV = %.2f', ...
+title(sprintf('TNV-RFM Local AC (GT= %.2f)\n%.3f $\\pm$ %.3f,  \\%%CV = %.2f', ...
                alpha_sam, m_a, s_a, cv_a), ...
       'Interpreter', 'latex');
 set(gca,'fontsize',fontSize)
