@@ -191,7 +191,37 @@ figure,
 stem(slope_cgs_col),
 yline(mean(slope_cgs_col), 'k--', 'DisplayName', num2str(mean(slope_cgs_col)))
 xlabel('Ncol'), ylabel('Slope')
+title('CGS per iteration')
 legend('Location', 'best')
+
+A_full    = kron(speye(num_cols), x);
+At_full   = A_full';
+
+b_full    = y_array(:);
+
+slope_full = cgs(At_full*A_full, At_full*b_full);
+slope_full = slope_full';
+
+figure,
+stem(slope_full, 'k')
+yline(mean(slope_full), 'k--', 'DisplayName', num2str(mean(slope_full)))
+xlabel('Ncol'), ylabel('Slope')
+title('CGS ensemble')
+legend('Location', 'best')
+
+figure, 
+stem(slope_full - slope_cgs_col, 'r')
+title('\Delta')
+
+%%
+test_col = [1; 5 ;7]
+mat_test = kron(test_col, speye(3))
+mat_test2 = kron(speye(3), test_col)
+
+figure, imagesc(mat_test2)
+%%
+
+
 
 %% TNV Regularization specs
 
@@ -257,6 +287,9 @@ slope_cgs = cgs(At*A, At*b);
 fprintf('EMZ TNV Denoised Slope CGS: %f (GT= %.2f)\n', slope_cgs, slope);
 
 %%
+
+y_clean = y_temp;
+x =  x_temp(:, 1);
 figure;
 set(gcf, 'Units', 'pixels', 'Position', [100, 100, 1800, 600]); % [x, y, width, height]   
 
@@ -396,3 +429,398 @@ ylim([0 0.005])
 %     % Reconstruct the matrix
 %     y_tnv = U * S_thresholded * V';
 % end
+
+
+%% RFM TNV plot
+
+x =  x_temp(:, 1);
+freq_range = round(linspace(1, 90, 5));
+
+figure;
+set(gcf, 'Units', 'pixels', 'Position', [100, 100, 1800, 600]); % [x, y, width, height]   
+
+tiledlayout(1,3)
+
+nexttile
+plot(x, y_temp(:,freq_range), 'LineWidth', 1);
+title('FPR');
+xlabel('x-axis');
+ylabel('y-axis');
+% ylim([-5 25]);
+grid on;
+
+nexttile
+plot(x, y_denoised1(:,freq_range), 'LineWidth', 1);
+title('TNV v1');
+xlabel('x-axis');
+ylabel('y-axis');
+% ylim([-5 25]);
+grid on;
+
+nexttile
+plot(x, y_denoised2(:,freq_range), 'LineWidth', 1);
+title('TNV v2 ');
+xlabel('x-axis');
+ylabel('y-axis');
+% ylim([-5 25]);
+grid on;
+
+%%
+
+ii=fix(m/2) 
+jj=fix(n/2)
+
+x_temp = x_temp_all{ii, jj};
+y_temp = y_temp_all{ii, jj};
+
+lambda = 1;
+% TNV v1
+maxIter1 = 100;
+tol1 = 2e-3;
+
+% TNV2 
+weights2 = ones(length(band_ufr), 1);
+tau2 = 0.01;
+maxIter2 = 300;
+tol2 = 0.5e-3;
+stableIter2 = 10;
+
+%%%%%%%%%%%%%%%%%%%%% TNV DENOISING JOINT 1 %%%%%%%%%%%%%%%%%%%%%
+
+[y_denoised1, cost1, err1, fid1, reg1, iter1] = TNV_regularization(y_temp, ...
+    lambda, maxIter1, tol1);
+y_temp1 = y_denoised1;
+%%%%%%%%%%%%%%%%%%%%% TNV DENOISING JOINT 1 %%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%%%%%%% TNV DENOISING JOINT 2 %%%%%%%%%%%%%%%%%%%%%
+
+[y_denoised2, cost2, err2, fid2, reg2] = pdo_den_wtnv_1d(y_temp, ...
+    lambda, tau2, maxIter2, tol2, stableIter2, weights2);
+
+y_temp2 = y_denoised2;
+%%%%%%%%%%%%%%%%%%%%% TNV DENOISING JOINT 2 %%%%%%%%%%%%%%%%%%%%%
+
+% =====================  ORIGINAL
+
+A_full    = kron(speye(p_ufr), x_temp(:, 1));
+At_full   = A_full';
+b_full    = y_temp(:);
+
+slope_full = -cgs(At_full*A_full, At_full*b_full);
+slope_full = slope_full';
+
+figure,
+stem(slope_full, 'k')
+yline(mean(slope_full), 'k--', 'DisplayName', [num2str(mean(slope_full)), '\pm', num2str(std(slope_full))  ])
+xlabel('Ncol'), ylabel('Slope')
+title('ORIGINAL')
+legend('Location', 'best')
+
+% CONSIDERING INTERCEPT
+A1_full    = kron( speye(p_ufr), x_temp(:, 1) );
+A2_full    = kron( speye(p_ufr), ones(size( x_temp(:, 1))) );
+A_full = vertcat(A1_full, A2_full);
+
+At_full   = A_full';
+b_full    = y_temp(:);
+
+x_opt = cgs(At_full*A_full, At_full*b_full);
+slope_full = x_opt(1:end/2);
+inter_full = x_opt(end/2+1:end);
+
+figure,
+subplot(121)
+stem(slope_full, 'k')
+yline(mean(slope_full), 'k--', 'DisplayName', [num2str(mean(slope_full)), '\pm', num2str(std(slope_full))  ])
+xlabel('Ncol'), ylabel('Slope')
+title('ORIGINAL SLOPE')
+legend('Location', 'best')
+
+subplot(122)
+stem(inter_full, 'k')
+yline(mean(inter_full), 'k--', 'DisplayName', [num2str(mean(inter_full)), '\pm', num2str(std(inter_full))  ])
+xlabel('Ncol'), ylabel('Slope')
+title('ORIGINAL INTERCEPT')
+legend('Location', 'best')
+
+
+
+slope_fit_fx = zeros(1, p_ufr);
+inter_fit_fx = zeros(1, p_ufr);
+
+
+for ii = 1:p_ufr
+    [slope_fx, intercept_fx, ~, ~] = fit_linear(x_temp(:, ii), y_temp(:, ii), 2);
+    slope_fit_fx(1,ii) =    -slope_fx ;
+    inter_fit_fx(1,ii) =    intercept_fx ;
+end
+
+figure, 
+subplot(121)
+plot(band_ufr, slope_fit_fx, '.-')
+yline(mean(slope_fit_fx), 'k--', 'DisplayName', [num2str(mean(slope_fit_fx)), '\pm', num2str(std(slope_fit_fx))  ])
+title('Slope Fit')
+xlabel('Freq [MHz]')
+legend('Location', 'best')
+grid on;
+
+subplot(122)
+plot(band_ufr, inter_fit_fx, '.-')
+yline(mean(inter_fit_fx), 'k--', 'DisplayName', [num2str(mean(inter_fit_fx)), '\pm', num2str(std(inter_fit_fx))  ])
+title('Intercept Fit')
+xlabel('Freq [MHz]')
+legend('Location', 'best')
+grid on;
+
+
+
+ % if (ii==fix(m/2) && jj==fix(n/6)) || (ii==fix(m/2) && jj==fix(n/2)) || (ii==fix(m/2) && jj==fix(5*n/6)) % different depths
+ %        % if (jj==fix(n/2) && ii==fix(m/6)) || (jj==fix(n/2) && ii==fix(m/2)) || (jj==fix(n/2) && ii==fix(5*m/6)) % different laterals
+freq1 = freqL+0.5; freq2 = 0.5*(freqL+freqH); freq3 = freqH-0.5;
+idx_f1 = find(band_ufr >= freq1, 1, 'first'); idx_f2 = find(band_ufr >= freq2, 1, 'first'); idx_f3 = find(band_ufr >= freq3, 1, 'first');
+
+
+[slope_f1, intercept_f1, ~, ~] = fit_linear(x_temp(:, idx_f1), y_temp(:, idx_f1), 2); 
+[slope_f2, intercept_f2, ~, ~] = fit_linear(x_temp(:, idx_f2), y_temp(:, idx_f2), 2); 
+[slope_f3, intercept_f3, ~, ~] = fit_linear(x_temp(:, idx_f3), y_temp(:, idx_f3), 2); 
+
+
+
+
+figure;
+set(gcf, 'Units', 'pixels', 'Position', [100, 100, 1000, 600]); % [x, y, width, height]          
+
+title_f1 = sprintf('Freq %.2fMHz (a=%.2f)', band_ufr(idx_f1), slope_f1);
+plot(x_temp(:, idx_f1), y_temp(:, idx_f1), 'r.-', 'DisplayName', title_f1 ); 
+hold on; 
+title_f2 = sprintf('Freq %.2fMHz (a=%.2f)', band_ufr(idx_f2), slope_f2);
+plot(x_temp(:, idx_f2), y_temp(:, idx_f2), 'b.-', 'DisplayName', title_f2 ); 
+title_f3 = sprintf('Freq %.2fMHz (a=%.2f)', band_ufr(idx_f3), slope_f3);
+plot(x_temp(:, idx_f3), y_temp(:, idx_f3), 'k.-', 'DisplayName', title_f3 ); 
+hold off; grid on;
+title(sprintf('Data at ii = %d, jj = %d', ii, jj));
+xlabel('X_t [cm]'); ylabel('RS_{norm} [dB/MHz]');
+ylim([-20 20]);
+legend('Location','best')
+set(gca, 'FontSize', 22)
+        % end
+
+% ===================== TNV v1
+
+A_full    = kron(speye(p_ufr), x_temp(:, 1));
+At_full   = A_full';
+b_full    = y_denoised1(:);
+
+slope_full = -cgs(At_full*A_full, At_full*b_full);
+slope_full = slope_full';
+
+figure,
+stem(band_ufr , slope_full, 'k')
+yline(mean(slope_full), 'k--', 'DisplayName', [num2str(mean(slope_full)), '\pm', num2str(std(slope_full))  ])
+xlabel('Ncol'), ylabel('Slope')
+title('TNV v1')
+legend('Location', 'best')
+
+
+
+[slope_f1, intercept_f1, ~, ~] = fit_linear(x_temp(:, idx_f1), y_denoised1(:, idx_f1), 2); 
+[slope_f2, intercept_f2, ~, ~] = fit_linear(x_temp(:, idx_f2), y_denoised1(:, idx_f2), 2); 
+[slope_f3, intercept_f3, ~, ~] = fit_linear(x_temp(:, idx_f3), y_denoised1(:, idx_f3), 2); 
+
+figure;
+set(gcf, 'Units', 'pixels', 'Position', [100, 100, 1000, 600]); % [x, y, width, height]          
+
+title_f1 = sprintf('Freq %.2fMHz (a=%.2f)', band_ufr(idx_f1), slope_f1);
+plot(x_temp(:, idx_f1), y_denoised1(:, idx_f1), 'r.-', 'DisplayName', title_f1 ); 
+hold on; 
+title_f2 = sprintf('Freq %.2fMHz (a=%.2f)', band_ufr(idx_f2), slope_f2);
+plot(x_temp(:, idx_f2), y_denoised1(:, idx_f2), 'b.-', 'DisplayName', title_f2 ); 
+title_f3 = sprintf('Freq %.2fMHz (a=%.2f)', band_ufr(idx_f3), slope_f3);
+plot(x_temp(:, idx_f3), y_denoised1(:, idx_f3), 'k.-', 'DisplayName', title_f3 ); 
+hold off; grid on;
+title(sprintf('TNVv1 Data at ii = %d, jj = %d', ii, jj));
+xlabel('X_t [cm]'); ylabel('RS_{norm} [dB/MHz]');
+ylim([-20 20]);
+legend('Location','best')
+set(gca, 'FontSize', 22)
+
+% ===================== TNV v2
+
+A_full    = kron(speye(p_ufr), x_temp(:, 1));
+At_full   = A_full';
+b_full    = y_denoised2(:);
+
+slope_full = -cgs(At_full*A_full, At_full*b_full);
+slope_full = slope_full';
+
+figure,
+stem(slope_full, 'k')
+yline(mean(slope_full), 'k--', 'DisplayName', [num2str(mean(slope_full)), '\pm', num2str(std(slope_full))  ])
+xlabel('Ncol'), ylabel('Slope')
+title('TNV v2')
+legend('Location', 'best')
+
+[slope_f1, ~, ~, ~] = fit_linear(x_temp(:, idx_f1), y_denoised2(:, idx_f1), 2); 
+[slope_f2, ~, ~, ~] = fit_linear(x_temp(:, idx_f2), y_denoised2(:, idx_f2), 2); 
+[slope_f3, ~, ~, ~] = fit_linear(x_temp(:, idx_f3), y_denoised2(:, idx_f3), 2); 
+
+figure;
+set(gcf, 'Units', 'pixels', 'Position', [100, 100, 1000, 600]); % [x, y, width, height]          
+
+title_f1 = sprintf('Freq %.2fMHz (a=%.2f)', band_ufr(idx_f1), slope_f1);
+plot(x_temp(:, idx_f1), y_denoised2(:, idx_f1), 'r.-', 'DisplayName', title_f1 ); 
+hold on; 
+title_f2 = sprintf('Freq %.2fMHz (a=%.2f)', band_ufr(idx_f2), slope_f2);
+plot(x_temp(:, idx_f2), y_denoised2(:, idx_f2), 'b.-', 'DisplayName', title_f2 ); 
+title_f3 = sprintf('Freq %.2fMHz (a=%.2f)', band_ufr(idx_f3), slope_f3);
+plot(x_temp(:, idx_f3), y_denoised2(:, idx_f3), 'k.-', 'DisplayName', title_f3 ); 
+hold off; grid on;
+title(sprintf('TNVv2 Data at ii = %d, jj = %d', ii, jj));
+xlabel('X_t [cm]'); ylabel('RS_{norm} [dB/MHz]');
+ylim([-20 20]);
+legend('Location','best')
+set(gca, 'FontSize', 22)
+
+%% APR W1
+
+%% USE THIS FROM APRIL AND NOW ON
+%%%%%%%%%%%%%%%%%%%% FAST WAY %%%%%%%%%%%%%%%%%%%%
+
+% UFR strategy
+bw_ufr = [3 9];
+freqL = bw_ufr(1); freqH = bw_ufr(2);
+range = bandFull >= freqL & bandFull <= freqH;
+
+band_ufr    = bandFull(range);
+p_ufr       = length(band_ufr);
+
+RSp_k_ufr   = RSp_k(:,:,range);
+RSp_r_ufr   = RSp_r(:,:,range);
+
+
+% % DENOISING TNV RSP
+mu_range  = 10.^linspace(log10(0.1), log10(12), 15);
+tau_range = [0.0005 0.001 0.005 0.010 0.025 0.05];
+
+% mu_range  = 10.^linspace(log10(0.1), log10(12), 2);
+% tau_range = [0.001 0.005];
+
+maxIter     = 1000;
+stableIter  = 20;
+tol         = 1e-3; % tolerance error
+gamma = 1;
+vec_gamma = 1 + (10 - 1) * (1 - linspace(0, 1, p_ufr).^gamma);
+weigthChannels = vec_gamma;
+
+tic
+for tt = 1:length(tau_range)
+
+for uu = 1:length(mu_range)
+
+mu  = mu_range(uu);
+tau = tau_range(tt);
+
+
+[RSp_k_ufr_opt, cost, error, fid, reg] = pdo_den_wtnv(RSp_k_ufr, mu, tau, maxIter, tol, stableIter, weigthChannels);
+
+[RSp_r_ufr_opt, cost, error, fid, reg] = pdo_den_wtnv(RSp_r_ufr, mu, tau, maxIter, tol, stableIter, weigthChannels);
+
+
+% RFM METHOD
+
+% Convert depth values to cm
+z_ACS_cm = z_ACS * 1e2;      % Convert from meters to cm
+z_ACS_r_cm = z_ACS_r * 1e2;  % Convert reference depths to cm
+
+% Delta MHz 
+df_MHz = band_ufr(2) - band_ufr(1);
+
+% Preallocate cell arrays for storing x_temp and y_temp
+x_temp_all = cell(m, n);
+y_temp_all = cell(m, n);
+
+% tic;
+for jj = 1:n  % Loop over lateral positions (x_j)
+    for ii = 1:m  % Loop over depth positions (z_k)
+
+        % Temporary storage for this location
+        y_temp = nan(m_r, p_ufr);  % (Reference depth, Frequency) ** m_r
+        x_temp = nan(m_r, p_ufr);  % (Reference depth, Frequency) ** m_r
+
+        for r = 1:m_r  % Loop over reference depths
+            % if (ii==1 && r==1)
+            y_col = squeeze( ( (RSp_k_ufr_opt(ii, jj, :)) - (RSp_r_ufr_opt(r, jj, :)) ) /(4*df_MHz) *Np2dB ); % p_ufr x 1
+
+            X = z_ACS_cm(ii) - z_ACS_r_cm(r);
+
+            y_temp(r, :) = y_col; %**
+            x_temp(r, :) = X; % **
+
+        end
+        x_temp_all{ii, jj} = x_temp;
+        y_temp_all{ii, jj} = y_temp;
+
+    end
+end
+% t = toc;
+% fprintf('Loop way Elapsed time %.2f \n', t);
+%%%%%%%%%%%%%%%%%%%% FAST WAY %%%%%%%%%%%%%%%%%%%%
+
+% NOW ESTIMATION CGS RFM
+
+a_rfm = zeros(m, n); 
+for jj = 1:n  % Loop over lateral positions (x_j)
+    for ii = 1:m  % Loop over depth positions (z_k)
+
+        x_temp = x_temp_all{ii, jj};
+        y_temp = y_temp_all{ii, jj};
+
+        X_vec = x_temp(:);
+
+        y_vec = y_temp(:);
+        a_rfm(ii, jj) = -(X_vec' * X_vec) \ (X_vec' * y_vec);
+    end
+end
+    
+data_ACS_TNV.a_rfm_mu(:,:,uu) = a_rfm;
+end
+
+fulldataACS_TNV{tt} =  data_ACS_TNV;
+
+end
+
+t = toc;
+fprintf('Loop way Elapsed time %.2f \n', t);
+
+%%
+%%
+% FIGURES 
+
+%%%%%%%%%%%%%%%%%%%%%%%%% TNV %%%%%%%%%%%%%%%%%%%%%%%%
+
+caxis_acs = [0 1.1];
+
+font = 30;
+for tt = 1 : length(tau_range)
+
+    figure (tt+40)
+    set(tt+40,'units','normalized','outerposition',[0 0 1 1]);
+    set(gca,'FontSize',30);
+    
+    for uu = 1 : length(mu_range)
+
+        subplot (1,2,uu)
+        imagesc(fulldataACS_TNV{tt}.a_rfm_mu(:,:,uu), caxis_acs), grid on 
+        set(gca,'FontSize',12);
+        title(['\mu = ',num2str(mu_range(uu))], 'FontSize', font-15);
+        % xlabel('Lateral [cm]', 'FontSize', 14) 
+        % ylabel('Axial [cm]', 'FontSize', 14)
+        colormap jet, 
+        h1 = colorbar;
+        ylabel(h1,'dB.cm^{-1}.MHz^{-1}','FontSize', 14);
+        
+    end
+    sgtitle(['\bf TNV RFM \tau = ', ...
+        num2str(tau_range(tt)) ], ...
+       'FontSize', font ); 
+end

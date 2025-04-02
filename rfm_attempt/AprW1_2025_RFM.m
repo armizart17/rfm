@@ -17,13 +17,13 @@ calc2dStats = {@(x) mean(x(:)), @(x) std(x(:)), @(x) 100 * std(x(:)) / mean(x(:)
 %% LOAD SAM
 
 % DATA NEW AMZ
-pathData = 'C:\Users\armiz\OneDrive\Documentos\MATLAB\dataLIM\dataACS_kwave';
+% pathData = 'C:\Users\armiz\OneDrive\Documentos\MATLAB\dataLIM\dataACS_kwave';
 
 % DATA LIM PC
-% pathData = 'D:\emirandaz\qus\data\attenuation\simu';
+pathData = 'D:\emirandaz\qus\data\attenuation\simu';
 
 %%%%%%%%%%%%%%% NEW MARCH %%%%%%%%%%%%%%%
-alpha_sam = 0.7; % ACS 0.4 0.5 0.6 0.7 1
+alpha_sam = 0.5; % ACS 0.4 0.5 0.6 0.7 1
 folderDataSam = 'a_pow1p';
 rf_sam_name = sprintf('rf1_a_%.2g', alpha_sam);
 % rf_sam_name = strrep(rf_sam_name, '.', 'p');
@@ -197,6 +197,7 @@ RSp_k(:,:, 2:end) = Sp_k(:,:, 2:end) ./ Sp_k(:,:, 1:end-1); clear Sp_k
 % For the first slice, keep the ratio the same as the first slice
 RSp_k(:,:, 1) = RSp_k(:,:, 2); % Assuming the first slice ratios are 1 as there is no "i-1"
 
+RSp_k = log(RSp_k); % @@
 %% Reference Depth
 
 % blocksize_wv_r = blocksize_wv *2;
@@ -261,6 +262,7 @@ RSp_r(:,:, 2:end) = Sp_r(:,:, 2:end) ./ Sp_r(:,:, 1:end-1); clear Sp_r
 % For the first slice, keep the ratio the same as the first slice
 RSp_r(:,:, 1) = RSp_r(:,:, 2); % Assuming the first slice ratios are 1 as there is no "i-1"
 
+RSp_r = log(RSp_r); % @@
 %% USE THIS FROM APRIL AND NOW ON
 %%%%%%%%%%%%%%%%%%%% FAST WAY %%%%%%%%%%%%%%%%%%%%
 
@@ -269,11 +271,68 @@ bw_ufr = [3 9];
 freqL = bw_ufr(1); freqH = bw_ufr(2);
 range = bandFull >= freqL & bandFull <= freqH;
 
+band_ufr    = bandFull(range);
+p_ufr       = length(band_ufr);
+
 RSp_k_ufr   = RSp_k(:,:,range);
 RSp_r_ufr   = RSp_r(:,:,range);
 
-band_ufr    = bandFull(range);
-p_ufr       = length(band_ufr);
+%%
+% DENOISING TNV RSP
+mu          = 1;
+tau         = 0.01;
+maxIter     = 1000;
+stableIter  = 20;
+% tol         = 0.5e-4; % tolerance error
+tol         = 1e-3; % tolerance error
+RSp_k_ufr_vec = reshape(RSp_k_ufr, [], size(RSp_k_ufr, 3));   
+mux_RSp = 1./(abs(mean(RSp_k_ufr_vec, 1, 'omitnan')) ./ std(RSp_k_ufr_vec, 0, 1, 'omitnan') + 1E-5);
+% weigthChannels = rescale(mux_RSp, 1, 10);
+% weigthChannels = mux_RSp;
+weigthChannels = ones(1, p_ufr);
+
+gamma = 1;
+vec_gamma = 1 + (10 - 1) * (1 - linspace(0, 1, p_ufr).^gamma);
+vec_log = logspace(log10(10), log10(1), p_ufr);
+figure, plot(vec_gamma)
+
+% weigthChannels = vec_gamma;
+
+[RSp_k_ufr_opt, cost, error, fid, reg] = pdo_den_wtnv(RSp_k_ufr, mu, tau, maxIter, tol, stableIter, weigthChannels);
+
+[RSp_r_ufr_opt, cost, error, fid, reg] = pdo_den_wtnv(RSp_r_ufr, mu, tau, maxIter, tol, stableIter, weigthChannels);
+
+
+%% Plot settings
+rows = 3; cols = 5;
+total_plots = rows * cols;
+l_Rps = round(linspace(1, 90, total_plots));
+
+% ORIGINAL
+figure;
+t = tiledlayout(rows, cols, 'Padding', 'compact', 'TileSpacing', 'compact');
+for i = 1:total_plots
+    slice_idx = l_Rps(i);
+    nexttile;
+    imagesc(RSp_k_ufr(:, :, slice_idx));
+    axis off;
+    title(['RSp ', num2str(round(band_ufr(slice_idx),2)), 'MHz']);
+end
+
+% TNV
+figure;
+t = tiledlayout(rows, cols, 'Padding', 'compact', 'TileSpacing', 'compact');
+for i = 1:total_plots
+    slice_idx = l_Rps(i);
+    nexttile;
+    imagesc(RSp_k_ufr_opt(:, :, slice_idx));
+    axis off;
+    title(['TNV RSp ', num2str(round(band_ufr(slice_idx),2)), 'MHz']);
+end
+%% RFM METHOD
+
+RSp_k_ufr = RSp_k_ufr_opt;
+RSp_r_ufr = RSp_r_ufr_opt;
 
 % Convert depth values to cm
 z_ACS_cm = z_ACS * 1e2;      % Convert from meters to cm
@@ -296,7 +355,7 @@ for jj = 1:n  % Loop over lateral positions (x_j)
 
         for r = 1:m_r  % Loop over reference depths
             % if (ii==1 && r==1)
-            y_col = squeeze( ( log(RSp_k_ufr(ii, jj, :)) - log(RSp_r_ufr(r, jj, :)) ) /(4*df_MHz) *Np2dB ); % p_ufr x 1
+            y_col = squeeze( ( (RSp_k_ufr(ii, jj, :)) - (RSp_r_ufr(r, jj, :)) ) /(4*df_MHz) *Np2dB ); % p_ufr x 1
 
             X = z_ACS_cm(ii) - z_ACS_r_cm(r);
 
@@ -313,7 +372,42 @@ t = toc;
 fprintf('Loop way Elapsed time %.2f \n', t);
 %%%%%%%%%%%%%%%%%%%% FAST WAY %%%%%%%%%%%%%%%%%%%%
 
-%% NOW ESTIMATION 
+% NOW ESTIMATION CGS RFM
+
+a_rfm = zeros(m, n); 
+for jj = 1:n  % Loop over lateral positions (x_j)
+    for ii = 1:m  % Loop over depth positions (z_k)
+
+        x_temp = x_temp_all{ii, jj};
+        y_temp = y_temp_all{ii, jj};
+
+        X_vec = x_temp(:);
+
+        y_vec = y_temp(:);
+        a_rfm(ii, jj) = -(X_vec' * X_vec) \ (X_vec' * y_vec);
+    end
+end
+%
+% RFM
+[m_a, s_a, cv_a] = deal(calc2dStats{1}(a_rfm), calc2dStats{2}(a_rfm), calc2dStats{3}(a_rfm));
+caxis_acs = [0 1.1];
+fontSize = 14;
+
+figure, 
+imagesc(x_ACS * 1e3, z_ACS * 1e3, a_rfm, caxis_acs); % Convert to mm
+axis("image")
+colorbar; colormap("turbo")
+xlabel('Lateral [mm]');
+ylabel('Depth [mm]');
+hb2=colorbar; ylabel(hb2,'dB\cdotcm^{-1}\cdotMHz^{-1}')
+% title('Local Attenuation Coefficient');
+title(sprintf('RFM Local AC (GT= %.2f)\n%.3f $\\pm$ %.3f,  \\%%CV = %.2f', ...
+               alpha_sam, m_a, s_a, cv_a), ...
+      'Interpreter', 'latex');
+set(gca,'fontsize',fontSize)
+
+
+%% NOW ESTIMATION TNV
 
 [XX_ACS,ZZ_ACS] = meshgrid(x_ACS, z_ACS);
 [Xq,Zq] = meshgrid(x,z);
@@ -323,7 +417,8 @@ a_rfm1 = zeros(m, n);
 a_rfm2 = zeros(m, n);
 
 % REG
-mu_range = 10.^(0.1:0.05:1);
+% mu_range = 10.^(0.1:0.05:1);
+mu_range = 10.^linspace(0.1, 1.2, 15);
 
 % TNV v1
 maxIter1 = 20;
@@ -340,10 +435,12 @@ stableIter2 = 10;
 a_rfm_tnv1 = zeros(m,n, length(mu_range));
 a_rfm_tnv2 = zeros(m,n, length(mu_range));
 
+
+tic;
 for uu = 1:length(mu_range)
 lambda = mu_range(uu);
 
-tic;
+
 for jj = 1:n  % Loop over lateral positions (x_j)
     for ii = 1:m  % Loop over depth positions (z_k)
 
@@ -377,8 +474,7 @@ for jj = 1:n  % Loop over lateral positions (x_j)
 
     end
 end
-t = toc;
-fprintf('Loop way for mu = %.2f, Elapsed time %.2f \n', lambda, t);
+
 
 
 % SAVE MAP
@@ -398,10 +494,14 @@ r2  = get_metrics_homo_gt(AttInterp2, true(size(AttInterp2)), alpha_sam, 'RFM-TN
 r1.mu = lambda;
 r2.mu = lambda;
 
-MetricsParam(uu)   = r1; 
-MetricsParam(uu+1) = r2; 
+MetricsParam(uu*2-1)   = r1; 
+MetricsParam(uu*2)     = r2; 
 
 end
+
+t = toc;
+% fprintf('Loop way for mu = %.2f, Elapsed time %.2f \n', lambda, t);
+fprintf('Elapsed time %.2f \n', t);
 
 % SAVE DATA
 outDir0 = 'D:\emirandaz\qus\rfm\tnv';
@@ -418,24 +518,72 @@ save(fullfile(outDir, fileNameOut),"a_rfm_tnv1", "a_rfm_tnv2", ...
 %%
 keyboard
 
-%%
-% RFM
-[m_a, s_a, cv_a] = deal(calc2dStats{1}(a_rfm), calc2dStats{2}(a_rfm), calc2dStats{3}(a_rfm));
-caxis_acs = [0 1.1];
-fontSize = 14;
 
+%%
+
+acs_range = [0 1.1];
 figure, 
-imagesc(x_ACS * 1e3, z_ACS * 1e3, a_rfm, caxis_acs); % Convert to mm
-axis("image")
-colorbar; colormap("turbo")
-xlabel('Lateral [mm]');
-ylabel('Depth [mm]');
-hb2=colorbar; ylabel(hb2,'dB\cdotcm^{-1}\cdotMHz^{-1}')
-% title('Local Attenuation Coefficient');
-title(sprintf('RFM Local AC (GT= %.2f)\n%.3f $\\pm$ %.3f,  \\%%CV = %.2f', ...
-               alpha_sam, m_a, s_a, cv_a), ...
-      'Interpreter', 'latex');
-set(gca,'fontsize',fontSize)
+sgtitle('RFM TNV 1')
+for uu = 1:length(mu_range)
+subplot(4, 5, uu)
+imagesc(x_ACS, z_ACS, a_rfm_tnv1(:,:,uu), acs_range)
+title(['\mu=', num2str(mu_range(uu))]);
+colormap("jet")
+end
+
+acs_range = [0 1.1];
+figure, 
+sgtitle('RFM TNV 2')
+for uu = 1:length(mu_range)
+subplot(4, 5, uu)
+imagesc(x_ACS, z_ACS, a_rfm_tnv2(:,:,uu), acs_range)
+title(['\mu=', num2str(mu_range(uu))]);
+colormap("jet")
+end
+
+%%
+Tacs        = struct2table(MetricsParam);
+Tacs.method = categorical(Tacs.method);
+
+muVec = Tacs(Tacs.method=='RFM-TNV1',:).mu;
+tabTNV1 =Tacs(Tacs.method=='RFM-TNV1',:);
+tabTNV2 =Tacs(Tacs.method=='RFM-TNV2',:);
+
+colors = lines(2);
+lw = 1.5;
+
+figure,
+hold on
+semilogx((muVec),100*tabTNV1.rmse_homo, '*-', 'LineWidth',lw)
+semilogx((muVec),100*tabTNV2.rmse_homo, '*-', 'LineWidth',lw)
+xlabel('\mu')
+% plot(log10(muVec),100*tabTNV1.rmse_homo, '*-', 'LineWidth',lw)
+% plot(log10(muVec),100*tabTNV2.rmse_homo, '*-', 'LineWidth',lw)
+% xlabel('log_{10}\mu')
+hold off
+ylabel('RMSE [%]')
+grid on
+legend('TNV1','TNV2')
+title('RMSE')
+% ylim([0 20])
+xlim([0 10])
+
+
+figure,
+hold on
+errorbar((muVec),tabTNV1.mean_homo,tabTNV1.std_homo, 'LineWidth',lw)
+errorbar((muVec),tabTNV2.mean_homo,tabTNV2.std_homo, 'LineWidth',lw)
+yline(alpha_sam, 'k--')
+% yline(groundTruthTargets(end), '--', 'Color',colors(2,:))
+hold off
+xlabel('\mu')
+ylabel('ACS [dB/cm/MHz]')
+grid on
+legend('TNV1','TNV2')
+title('TNV-RFM')
+ylim([0 1.1])
+
+
 
 
 %%
@@ -463,6 +611,10 @@ att_ref_map = reshape(att_ref, 1, 1, []); % 3D array as SLogRatio
 
 SLogRatio = log(Sp_sam./Sd_sam) - ( log(Sp_ref./Sd_ref) - 4*zd_zp*1E2*att_ref_map ); % (rows, cols, freqChannels)
 clear('Sp_sam','Sd_sam', 'Sp_ref', 'Sd_ref', 'att_ref_map', 'att_ref');
+
+SLogRatio_vec = reshape(SLogRatio, [], size(SLogRatio, 3));   
+mux_SLogRatio = 1./(abs(mean(SLogRatio_vec, 1, 'omitnan')) ./ std(SLogRatio_vec, 0, 1, 'omitnan') + 1E-5);
+weightEstimators = rescale(mux_SLogRatio, 1, max(mux_SLogRatio));
 
 [m, n, ~] = size(SLogRatio);
 A1 = kron( 4*zd_zp*1E2*band , speye(m*n) );
@@ -570,7 +722,7 @@ for ff = 1:p
         
         % Store ACS value
         % ATOT_RFM(ff, jj) = -lin_slope; % -8.68*m/(4*delta_f) [dB/MHz/cm]
-        ATOT_RFM(ff, jj) = +lin_slope; % -8.68*m/(4*delta_f) [dB/MHz/cm]
+        ATOT_RFM(ff, jj) = -lin_slope; % -8.68*m/(4*delta_f) [dB/MHz/cm]
     end
 end
 

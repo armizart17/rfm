@@ -22,7 +22,7 @@ calc2dStats = {@(x) mean(x(:)), @(x) std(x(:)), @(x) 100 * std(x(:)) / mean(x(:)
 pathData = 'D:\emirandaz\qus\data\attenuation\simu';
 
 %%%%%%%%%%%%%%% NEW MARCH %%%%%%%%%%%%%%%
-alpha_sam = 0.7; % ACS 0.4 0.5 0.6 0.7 1
+alpha_sam = 0.6; % ACS 0.4 0.5 0.6 0.7 1
 folderDataSam = 'a_pow1p';
 rf_sam_name = sprintf('rf1_a_%.2g', alpha_sam);
 % rf_sam_name = strrep(rf_sam_name, '.', 'p');
@@ -339,12 +339,12 @@ for jj = 1:n  % Loop over lateral positions (x_j)
         %%%%%%%%%%%%%%%%%%%%% TV DENOISING PER CHANNEL %%%%%%%%%%%%%%%%%%%%%
 
         %%%%%%%%%%%%%%%%%%%%% TNV DENOISING JOINT %%%%%%%%%%%%%%%%%%%%%
-        lambda   = 1;  % Regularization parameter
-        max_iter = 20;
-        tol = 2e-3;
-        [y_denoised, cost1, err1, fid1, reg1, iter1] = TNV_regularization(y_temp, ...
-            lambda, max_iter, tol);
-        y_temp = y_denoised;
+        % lambda   = 1;  % Regularization parameter
+        % max_iter = 20;
+        % tol = 2e-3;
+        % [y_denoised, cost1, err1, fid1, reg1, iter1] = TNV_regularization(y_temp, ...
+        %     lambda, max_iter, tol);
+        % y_temp = y_denoised;
         %%%%%%%%%%%%%%%%%%%%% TNV DENOISING JOINT %%%%%%%%%%%%%%%%%%%%%
 
 

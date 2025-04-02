@@ -21,8 +21,8 @@ function [x, cost, error, fid, reg] = pdo_den_wtnv(y, lambda, tau, maxIter, tol,
     fid(1) = 1;
     reg(1) = 1;
     
-%     disp('Itn   |    Cost   |   Delta(Cost)');
-%     disp('----------------------------------');
+    disp('Itn   |    Cost   |   Delta(Cost)');
+    disp('----------------------------------');
     
     while (iter < maxIter) && (ee > tol)  
 		x = prox_tau_f(x2-tau*opDadj(u2),y,tau);
@@ -63,6 +63,7 @@ function [x, cost, error, fid, reg] = pdo_den_wtnv(y, lambda, tau, maxIter, tol,
 % 				primalcostlowerbound,primalcost-primalcostlowerbound);
 %             
             % fprintf('%4d  | %f | %e\n',iter, cost(iter+1), error(iter+1));
+            fprintf('%4d  | %.3f | %.3fe-3\n', iter, cost(iter+1), error(iter+1)/1e-3);
 
 %%%% For time execution
 

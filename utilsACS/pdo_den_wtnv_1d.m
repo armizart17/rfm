@@ -66,14 +66,14 @@ function [x, cost, error, fid, reg] = pdo_den_wtnv_1d(y, lambda, tau, maxIter, t
             fprintf('%4d  | %f | %e\n',iter, cost(iter+1), error(iter+1));
         end
         
-        figure(19), 
-        plot(x(:,1:10:50), 'LineWidth', 1);
-        title(['TNV v2 Iter: ', num2str(iter)]);
-        xlabel('x-axis');
-        ylabel('y-axis');
-        ylim([-5 25]);
-        grid on;
-        pause(0.01)
+        % figure(19), 
+        % plot(x(:,1:10:50), 'LineWidth', 1);
+        % title(['TNV v2 Iter: ', num2str(iter)]);
+        % xlabel('x-axis');
+        % ylabel('y-axis');
+        % ylim([-5 25]);
+        % grid on;
+        % pause(0.01)
 
         iter = iter + 1;
     end
