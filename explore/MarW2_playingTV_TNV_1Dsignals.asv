@@ -699,11 +699,11 @@ RSp_r_ufr   = RSp_r(:,:,range);
 
 
 % % DENOISING TNV RSP
-mu_range  = 10.^linspace(log10(0.1), log10(10), 15);
-tau_range = [0.0005 0.001 0.005 0.010 0.025 0.05];
+% mu_range  = 10.^linspace(log10(0.1), log10(12), 15);
+% tau_range = [0.0005 0.001 0.005 0.010 0.025 0.05];
 
-% mu_range  = 10.^linspace(log10(0.1), log10(7), 5);
-% tau_range = [0.01 ];
+mu_range  = 10.^linspace(log10(0.1), log10(12), 5);
+tau_range = [0.01 ];
 
 maxIter     = 1000;
 stableIter  = 20;
@@ -818,16 +818,15 @@ for tt = 1 : length(tau_range)
 
         imagesc(a_rfm, caxis_acs), grid on 
         set(gca,'FontSize',12);
-        % title(['\mu = ',num2str(mu_range(uu))], 'FontSize', font-15);
-        title(sprintf('TNV-RFM ($\\mu$ = %.2f, GT = %.2f)\n%.3f $\\pm$ %.3f, CV = %.2f\\%%', ...
-               mu_range(uu), alpha_sam, m_a, s_a, cv_a), ...
-        'Interpreter', 'latex');
-
+        title(['\mu = ',num2str(mu_range(uu))], 'FontSize', font-15);
+        title(sprintf('TNV-RFM \mu= %.2f, (GT= %.2f)\n%.3f $\\pm$ %.3f,  \\%%CV = %.2f', ...
+               alpha_sam, m_a, s_a, cv_a), ...
+      'Interpreter', 'latex')
         % xlabel('Lateral [cm]', 'FontSize', 14) 
         % ylabel('Axial [cm]', 'FontSize', 14)
         colormap jet, 
         h1 = colorbar;
-        % ylabel(h1,'dB.cm^{-1}.MHz^{-1}','FontSize', 14);
+        ylabel(h1,'dB.cm^{-1}.MHz^{-1}','FontSize', 14);
         
     end
     sgtitle(['\bf TNV RFM \tau = ', ...
