@@ -11,8 +11,8 @@ pars.lambda      = 1540/6*1e-6;
 
 %% PLOT FULL Spectrum through Depth
 
-spectralData_sam = calc_powerSpectra_vSimple(SAM, pars);
-% spectralData_sam = calc_powerSpectraFull_prox_dis(SAM, pars);
+% spectralData_sam = calc_powerSpectra_vSimple(SAM, pars);
+spectralData_sam = calc_powerSpectraFull_prox_dis(SAM, pars);
 
 ratio_dB = -20;
 ratio = db2mag(ratio_dB);

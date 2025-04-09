@@ -467,11 +467,21 @@ grid on;
 
 %%
 
-ii=fix(m/2) 
-jj=fix(n/2)
+ii = fix(m/2);
+jj = fix(n/2);
+
+% ii = fix(m/4);
+% ii = fix(m/2);
+% ii = fix(3*m/4);
 
 x_temp = x_temp_all{ii, jj};
 y_temp = y_temp_all{ii, jj};
+
+% ALL TOGETHER
+X_vec = x_temp(:);
+y_vec = y_temp(:);
+aaa = -(X_vec' * X_vec) \ (X_vec' * y_vec)
+aaa = abs( (X_vec' * X_vec) \ (X_vec' * y_vec) )
 
 lambda = 1;
 % TNV v1
@@ -507,11 +517,13 @@ At_full   = A_full';
 b_full    = y_temp(:);
 
 slope_full = -cgs(At_full*A_full, At_full*b_full);
-slope_full = slope_full';
+slope_full = (slope_full)';
 
 figure,
 stem(slope_full, 'k')
 yline(mean(slope_full), 'k--', 'DisplayName', [num2str(mean(slope_full)), '\pm', num2str(std(slope_full))  ])
+yline(median(slope_full), 'k--', 'DisplayName', ['Med ', num2str(median(slope_full)) ])
+
 xlabel('Ncol'), ylabel('Slope')
 title('ORIGINAL')
 legend('Location', 'best')
@@ -519,46 +531,45 @@ legend('Location', 'best')
 % CONSIDERING INTERCEPT
 A1_full    = kron( speye(p_ufr), x_temp(:, 1) );
 A2_full    = kron( speye(p_ufr), ones(size( x_temp(:, 1))) );
-A_full = vertcat(A1_full, A2_full);
+A_full = horzcat(A1_full, A2_full);
 
 At_full   = A_full';
 b_full    = y_temp(:);
 
-x_opt = cgs(At_full*A_full, At_full*b_full);
+x_opt = -cgs(At_full*A_full, At_full*b_full);
 slope_full = x_opt(1:end/2);
 inter_full = x_opt(end/2+1:end);
 
 figure,
 subplot(121)
-stem(slope_full, 'k')
+stem(band_ufr, slope_full, 'k')
 yline(mean(slope_full), 'k--', 'DisplayName', [num2str(mean(slope_full)), '\pm', num2str(std(slope_full))  ])
+yline(median(slope_full), 'b--', 'DisplayName', ['Med ', num2str(median(slope_full)) ])
 xlabel('Ncol'), ylabel('Slope')
 title('ORIGINAL SLOPE')
 legend('Location', 'best')
 
 subplot(122)
-stem(inter_full, 'k')
+stem(band_ufr, inter_full, 'k')
 yline(mean(inter_full), 'k--', 'DisplayName', [num2str(mean(inter_full)), '\pm', num2str(std(inter_full))  ])
 xlabel('Ncol'), ylabel('Slope')
 title('ORIGINAL INTERCEPT')
 legend('Location', 'best')
 
-
-
 slope_fit_fx = zeros(1, p_ufr);
 inter_fit_fx = zeros(1, p_ufr);
-
-
-for ii = 1:p_ufr
-    [slope_fx, intercept_fx, ~, ~] = fit_linear(x_temp(:, ii), y_temp(:, ii), 2);
-    slope_fit_fx(1,ii) =    -slope_fx ;
-    inter_fit_fx(1,ii) =    intercept_fx ;
+for pp = 1:p_ufr
+    [slope_fx, intercept_fx, ~, ~] = fit_linear(x_temp(:, pp), y_temp(:, pp), 2);
+    slope_fit_fx(1,pp) =    -(slope_fx) ;
+    inter_fit_fx(1,pp) =    intercept_fx ;
 end
 
 figure, 
 subplot(121)
 plot(band_ufr, slope_fit_fx, '.-')
 yline(mean(slope_fit_fx), 'k--', 'DisplayName', [num2str(mean(slope_fit_fx)), '\pm', num2str(std(slope_fit_fx))  ])
+yline(median(slope_fit_fx), 'k--', 'DisplayName', ['Med ', num2str(median(slope_fit_fx))  ])
+
 title('Slope Fit')
 xlabel('Freq [MHz]')
 legend('Location', 'best')
@@ -566,12 +577,11 @@ grid on;
 
 subplot(122)
 plot(band_ufr, inter_fit_fx, '.-')
-yline(mean(inter_fit_fx), 'k--', 'DisplayName', [num2str(mean(inter_fit_fx)), '\pm', num2str(std(inter_fit_fx))  ])
+yline(mean(inter_fit_fx), 'k--', 'DisplayName', [num2str(median(inter_fit_fx)), '\pm', num2str(std(inter_fit_fx))  ])
 title('Intercept Fit')
 xlabel('Freq [MHz]')
 legend('Location', 'best')
 grid on;
-
 
 
  % if (ii==fix(m/2) && jj==fix(n/6)) || (ii==fix(m/2) && jj==fix(n/2)) || (ii==fix(m/2) && jj==fix(5*n/6)) % different depths
@@ -583,9 +593,6 @@ idx_f1 = find(band_ufr >= freq1, 1, 'first'); idx_f2 = find(band_ufr >= freq2, 1
 [slope_f1, intercept_f1, ~, ~] = fit_linear(x_temp(:, idx_f1), y_temp(:, idx_f1), 2); 
 [slope_f2, intercept_f2, ~, ~] = fit_linear(x_temp(:, idx_f2), y_temp(:, idx_f2), 2); 
 [slope_f3, intercept_f3, ~, ~] = fit_linear(x_temp(:, idx_f3), y_temp(:, idx_f3), 2); 
-
-
-
 
 figure;
 set(gcf, 'Units', 'pixels', 'Position', [100, 100, 1000, 600]); % [x, y, width, height]          

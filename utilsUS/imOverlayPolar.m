@@ -13,7 +13,7 @@ function [ax1,ax2] = imOverlayPolar(Bm,ACS,dynRange,attRange,transparency,xPolar
         Bm(1:end-omitLines,omitLines+1:end-omitLines))
     shading interp
     axis equal ij tight
-    
+
     % Create axes for Attenuation image
     view(2)
     ax2 = axes;

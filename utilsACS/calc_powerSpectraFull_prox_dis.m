@@ -92,6 +92,12 @@ function spectralData = calc_powerSpectraFull_prox_dis(data, pars)
     wx = round(blocksize_wv*lambda*(1-overlap)/dx);  % Between windows  
     nx = round(blocksize_wv*lambda/ dx);
 
+    if isfield(pars, 'blocklines')
+        blocklines = pars.blocklines;
+        wx = round(blocklines*(1-overlap));  % Between windows  
+        nx = blocklines;
+    end
+
     x0 = 1:wx:length(x)-nx;
     x_ACS = x(1,x0+round(nx/2));
     n  = length(x0);
@@ -126,6 +132,7 @@ function spectralData = calc_powerSpectraFull_prox_dis(data, pars)
 
     fprintf('\nWavelength: %.4f mm\n',lambda*1e3);
     fprintf('Blocksize in wavelengths: %i\n',blocksize_wv)
+    if isfield(pars, 'blocklines') fprintf('Blocksize in blocklines: %i\n',blocklines); end
     fprintf('Blocksize x: %.2f mm, z: %.2f mm\n',nx*dx*1e3,nz*dz*1e3)
     fprintf('Blocksize in pixels nx: %i, nz: %i\n',nx,nz);
     fprintf('Region of interest columns: %i, rows: %i\n\n',m,n);

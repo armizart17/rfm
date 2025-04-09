@@ -24,12 +24,19 @@ calc2dStats = {@(x) mean(x(:)), @(x) std(x(:)), @(x) 100 * std(x(:)) / mean(x(:)
 
 % DATA LIM PC
 pathData = 'D:\emirandaz\qus\data\liver\bf_M04_D02';
+figsDir = 'D:\emirandaz\qus\data\liver\rfm_v2';
+
+if ~exist(figsDir) mkdir(figsDir); end
 
 acqDir = dir(fullfile(pathData,'*.mat'));
 
+list_acqDir = [1 2 5 6 7 8 9 11 12 15 16 17 18 20];
+list_acqDir = [ 1 ]; %1 6 11 15
+for iList = 1:length(list_acqDir)
 
 % Each 5
-iAcq = 20;
+% iAcq = 1;
+iAcq = list_acqDir (iList);
 samName = acqDir(iAcq).name;
 fileName = fullfile(pathData, samName);
 
@@ -60,67 +67,158 @@ caption = strrep(samName(1:end-4), '_', ' ');
 %% SPECTRAL PARAMETERS
 pars.bw          = [1.2 3.9]; % [MHz]
 pars.overlap     = 0.8;
-pars.blocksize   = 16; % wavelengths
+pars.blocksize   = 12; % wavelengths
 pars.blocklines  = 8;
-% pars.z_roi       = [5 45]*1E-3; % [m] 
-% pars.x_roi       = [-17 17]*1E-3; % [m] 
 pars.saran_layer = false;
 pars.ratio_zx    = 1;
 pars.window_type = 3; %  (1) Hanning, (2) Tuckey, (3) Hamming, (4) Tchebychev
 
-blocksize_wv_r = 20;
+blocksize_wv_r = 16;
 
-%% ROI SELECTION
-if ~manualroi
+%% ROI SELECTION (I DID 14 cases)
 
-    pars.z_roi       = [62.65 130]*1E-3; % [m] 
-    pars.x_roi       = [-27 -5.8];        % [°] 
-        
+fprintf('ID N° %d : %s\n', iAcq, samName(1:end-4));
+
+if ( strcmp(samName(1:end-4), '42460445_IHR_F') )
+% pars.z_roi = [0.0534482412002264 0.0965834129422875];
+% pars.x_roi = [-23.5124207044383 -2.87523485999935];
+
+% pars.z_roi = [0.0464482412002264 0.0965834129422875];
+% pars.x_roi = [-24.0124207044383 -2.87523485999935];
+
+pars.z_roi = [0.0564482412002264 0.0965834129422875];
+pars.x_roi = [-24.5124207044383 -2.57523485999935];
+
+elseif ( strcmp(samName(1:end-4), '42460445_IOLAI_F') )
+pars.z_roi = [0.06265 0.13];
+pars.x_roi = [-27 -5.8];
+
+elseif ( strcmp(samName(1:end-4), '42460445_PL_F') )
+pars.z_roi = [0.04765518886002839 0.0887218844567291];
+pars.x_roi = [-20.3157416733283 1.23992789555525];
+
+elseif ( strcmp(samName(1:end-4), '44730576_IHR_F') )
+pars.z_roi = [0.0432077721719176 0.0787915326854975];
+pars.x_roi = [-25.0846951177715 3.52902554888802];
+
+% pars.z_roi = [0.023802428576483 0.0705162395428045];
+% pars.x_roi = [-22.2233230511056 10.587076646664];
+
+elseif ( strcmp(samName(1:end-4), '44730576_IOLAI_F') )
+pars.z_roi = [0.0361737730006286 0.0638960050286501];
+pars.x_roi = [-8.10722085555353 18.9804347088842];
+
+elseif ( strcmp(samName(1:end-4), '44730576_LCM_F') )
+pars.z_roi = [0.0456903601147255 0.074653886114151];
+pars.x_roi = [-15.3560300911073 9.0610115444422];
+
+% pars.z_roi = [0.0448628308004562 0.0684474162571313];
+% pars.x_roi = [-13.44844871333 10.2055603711086];
+
+elseif ( strcmp(samName(1:end-4), '44730576_LHI_F') )
+pars.z_roi = [0.0485867127146681 0.0763089447426896];
+pars.x_roi = [-21.4602904999946 4.6735743755544];
+
+elseif ( strcmp(samName(1:end-4), '70141854_IHR_F') )
+pars.z_roi = [0.0319664782005137 0.0771364740569589];
+pars.x_roi = [-17.4543696066623 12.8761742999968];
+
+% pars.z_roi = [0.0382425962863018 0.0643097696857848];
+% pars.x_roi = [-13.2576905755522 18.0266440199955];
+
+elseif ( strcmp(samName(1:end-4), '70141854_IOLAI_F') )
+pars.z_roi = [0.0419664782005137 0.0920320017138063];
+pars.x_roi = [-13.6392068511077 11.350109197775];
+
+elseif ( strcmp(samName(1:end-4), '70141854_PL_F') ) % (BESSELS)
+pars.z_roi = [0.0440353014861869 0.091204472399537];
+pars.x_roi = [-8.10722085555353 22.7955974644388];
+
+elseif ( strcmp(samName(1:end-4), '70897309_IHR_F') ) 
+pars.z_roi = [0.0382425962863018 0.0725850628284778];
+pars.x_roi = [-24.7031788422161 0.476895344444337];
+
+elseif ( strcmp(samName(1:end-4), '70897309_IOLAI_F') ) % LIKE IT
+pars.z_roi = [0.042794007514783 0.0870668258281905];
+pars.x_roi = [-18.5989184333287 11.5408673355527];
+
+elseif ( strcmp(samName(1:end-4), '70897309_LCM_F') ) 
+pars.z_roi = [0.0560344765430918 0.120581763056097];
+pars.x_roi = [-25.2754532555492 -1.81220230888842];
+
+elseif ( strcmp(samName(1:end-4), '70897309_PL_F') ) 
+pars.z_roi = [0.0432077721719176 0.112720234570539];
+pars.x_roi = [-28.7090997355484 -5.62736506444304];
+
 else 
 
-    figure('Units','centimeters', 'Position',[5 5 15 15]),
-    imagesc(SAM.x, SAM.z*1E3,bmode_sam,range_bmode);
-    colormap gray; clim(range_bmode);
-    hb2=colorbar; ylabel(hb2,'dB')
-    xlabel('Lateral [mm]'), ylabel('Depth [mm]'); 
-    title(caption)
-    
-    confirmation = '';
-    while ~strcmp(confirmation,'Yes')
-        rect = getrect;
-        confirmation = questdlg('Sure?');
-        if strcmp(confirmation,'Cancel')
-            disp(rect)
-            break
-        end
-    end
-    close,
+    % figure('Units','centimeters', 'Position',[5 5 15 15]),
+    % imagesc(SAM.x, SAM.z*1E3,bmode_sam,range_bmode);
+    % colormap gray; clim(range_bmode);
+    % hb2=colorbar; ylabel(hb2,'dB')
+    % xlabel('Lateral [mm]'), ylabel('Depth [mm]'); 
+    % title(caption)
+    % 
+    % confirmation = '';
+    % while ~strcmp(confirmation,'Yes')
+    %     rect = getrect;
+    %     confirmation = questdlg('Sure?');
+    %     if strcmp(confirmation,'Cancel')
+    %         disp(rect)
+    %         break
+    %     end
+    % end
+    % close,
+    % 
+    % pars.x_roi     = [rect(1), rect(1)+rect(3)];      % [º]
+    % pars.z_roi     = [rect(2), rect(2)+rect(4)]*1E-3; % [m]
+    continue;
 
-    pars.x_roi     = [rect(1), rect(1)+rect(3)];      % [º]
-    pars.z_roi     = [rect(2), rect(2)+rect(4)]*1E-3; % [m]
 end
 
+%%
+if manualroi 
+figure('Units','centimeters', 'Position',[5 5 15 15]),
+imagesc(SAM.x, SAM.z*1E3,bmode_sam,range_bmode);
+colormap gray; clim(range_bmode);
+hb2=colorbar; ylabel(hb2,'dB')
+xlabel('Lateral [mm]'), ylabel('Depth [mm]'); 
+title(caption)
+
+confirmation = '';
+while ~strcmp(confirmation,'Yes')
+    rect = getrect;
+    confirmation = questdlg('Sure?');
+    if strcmp(confirmation,'Cancel')
+        disp(rect)
+        break
+    end
+end
+close,
+
+pars.x_roi     = [rect(1), rect(1)+rect(3)];      % [º]
+pars.z_roi     = [rect(2), rect(2)+rect(4)]*1E-3; % [m]
+end
 %% CHECK ROI
 
-figure,
-imagesc(SAM.x, SAM.z*1E3, bmode_sam,range_bmode), 
-hb2=colorbar; ylabel(hb2,'dB')
-rectangle('Position', [pars.x_roi(1) 1E3*pars.z_roi(1) pars.x_roi(2)-pars.x_roi(1) 1E3*(pars.z_roi(2)-pars.z_roi(1))], ...
-        'EdgeColor','r', 'LineWidth', 2, 'LineStyle','--'), hold off;
-xlabel('Lateral [º]'), 
-ylabel('Depth [mm]');
-title(caption)
-% axis("image");
-colormap('gray')
+% figure,
+% imagesc(SAM.x, SAM.z*1E3, bmode_sam,range_bmode), 
+% hb2=colorbar; ylabel(hb2,'dB')
+% rectangle('Position', [pars.x_roi(1) 1E3*pars.z_roi(1) pars.x_roi(2)-pars.x_roi(1) 1E3*(pars.z_roi(2)-pars.z_roi(1))], ...
+%         'EdgeColor','r', 'LineWidth', 2, 'LineStyle','--'), hold off;
+% xlabel('Lateral [º]'), 
+% ylabel('Depth [mm]');
+% title(caption)
+% % axis("image");
+% colormap('gray')
 
 %% (Remove later is to check roi)
 
-fprintf("ID %s \n", samName(1:end-4))
-fprintf('pars.z_roi = %s;\n', mat2str(pars.z_roi));
-fprintf('pars.x_roi = %s;\n', mat2str(pars.x_roi));
-%%
-keyboard
+% fprintf('==========(ROI)===========\n')
+fprintf('Axial [mm] = %s;\n', mat2str(round(1e3*pars.z_roi,2)));
+fprintf('Lateral [°] = %s;\n', mat2str(round(pars.x_roi,2)));
 
+%%
 %% RFM V1 
 % Reading experiment settings parameters
 bw              = pars.bw;
@@ -253,7 +351,7 @@ RSp_k(:,:, 2:end) = Sp_k(:,:, 2:end) ./ Sp_k(:,:, 1:end-1);
 RSp_k(:,:, 1) = RSp_k(:,:, 2); % Assuming the first slice ratios are 1 as there is no "i-1"
 
 RSp_k = log(RSp_k); % @@
-%% Reference Depth
+% Reference Depth
 
 % blocksize_wv_r = blocksize_wv *2;
 blocksize_wv_r = blocksize_wv_r;
@@ -319,7 +417,7 @@ RSp_r(:,:, 2:end) = Sp_r(:,:, 2:end) ./ Sp_r(:,:, 1:end-1);
 RSp_r(:,:, 1) = RSp_r(:,:, 2); % Assuming the first slice ratios are 1 as there is no "i-1"
 
 RSp_r = log(RSp_r); % @@
-%% USE THIS FROM APRIL AND NOW ON
+% USE THIS FROM APRIL AND NOW ON
 %%%%%%%%%%%%%%%%%%%% FAST WAY %%%%%%%%%%%%%%%%%%%%
 
 % UFR strategy
@@ -334,11 +432,10 @@ p_ufr       = length(band_ufr);
 RSp_k_ufr   = RSp_k(:,:,range);
 RSp_r_ufr   = RSp_r(:,:,range);
 
-%%
-if (denTNVRFM)
+%
 % DENOISING TNV RSP
-mu          = 1;
-tau         = 0.01;
+mu          = 1.25;
+tau         = 0.0100;
 maxIter     = 1000;
 stableIter  = 20;
 % tol         = 0.5e-4; % tolerance error
@@ -360,40 +457,33 @@ weigthChannels = ones(1, p_ufr);
 
 [RSp_r_ufr_opt, cost, error, fid, reg] = pdo_den_wtnv(RSp_r_ufr, mu, tau, maxIter, tol, stableIter, weigthChannels);
 
-else
-    RSp_k_ufr_opt = RSp_k_ufr;
-    RSp_r_ufr_opt = RSp_r_ufr;
-end
-%% Plot settings
-rows = 3; cols = 5;
-total_plots = rows * cols;
-l_Rps = round(linspace(1, length(band_ufr), total_plots));
-
-% ORIGINAL
-figure;
-t = tiledlayout(rows, cols, 'Padding', 'compact', 'TileSpacing', 'compact');
-for i = 1:total_plots
-    slice_idx = l_Rps(i);
-    nexttile;
-    imagesc(RSp_k_ufr(:, :, slice_idx));
-    axis off;
-    title(['RSp ', num2str(round(band_ufr(slice_idx),2)), 'MHz']);
-end
-
-% TNV
-figure;
-t = tiledlayout(rows, cols, 'Padding', 'compact', 'TileSpacing', 'compact');
-for i = 1:total_plots
-    slice_idx = l_Rps(i);
-    nexttile;
-    imagesc(RSp_k_ufr_opt(:, :, slice_idx));
-    axis off;
-    title(['TNV RSp ', num2str(round(band_ufr(slice_idx),2)), 'MHz']);
-end
-%% RFM METHOD
-
-RSp_k_ufr = RSp_k_ufr_opt;
-RSp_r_ufr = RSp_r_ufr_opt;
+% Plot settings
+% rows = 3; cols = 5;
+% total_plots = rows * cols;
+% l_Rps = round(linspace(1, length(band_ufr), total_plots));
+% 
+% % ORIGINAL
+% figure;
+% t = tiledlayout(rows, cols, 'Padding', 'compact', 'TileSpacing', 'compact');
+% for i = 1:total_plots
+%     slice_idx = l_Rps(i);
+%     nexttile;
+%     imagesc(RSp_k_ufr(:, :, slice_idx));
+%     axis off;
+%     title(['RSp ', num2str(round(band_ufr(slice_idx),2)), 'MHz']);
+% end
+% 
+% % TNV
+% figure;
+% t = tiledlayout(rows, cols, 'Padding', 'compact', 'TileSpacing', 'compact');
+% for i = 1:total_plots
+%     slice_idx = l_Rps(i);
+%     nexttile;
+%     imagesc(RSp_k_ufr_opt(:, :, slice_idx));
+%     axis off;
+%     title(['TNV RSp ', num2str(round(band_ufr(slice_idx),2)), 'MHz']);
+% end
+% RFM METHOD
 
 % Convert depth values to cm
 z_ACS_cm = z_ACS * 1e2;      % Convert from meters to cm
@@ -405,6 +495,7 @@ df_MHz = band_ufr(2) - band_ufr(1);
 % Preallocate cell arrays for storing x_temp and y_temp
 x_temp_all = cell(m, n);
 y_temp_all = cell(m, n);
+y_temp_all2 = cell(m, n);
 
 tic;
 for jj = 1:n  % Loop over lateral positions (x_j)
@@ -412,20 +503,24 @@ for jj = 1:n  % Loop over lateral positions (x_j)
 
         % Temporary storage for this location
         y_temp = nan(m_r, p_ufr);  % (Reference depth, Frequency) ** m_r
+        y_temp2 = nan(m_r, p_ufr);  % (Reference depth, Frequency) ** m_r
         x_temp = nan(m_r, p_ufr);  % (Reference depth, Frequency) ** m_r
 
         for r = 1:m_r  % Loop over reference depths
             % if (ii==1 && r==1)
             y_col = squeeze( ( (RSp_k_ufr(ii, jj, :)) - (RSp_r_ufr(r, jj, :)) ) /(4*df_MHz) *Np2dB ); % p_ufr x 1
-
+            y_col2 = squeeze( ( (RSp_k_ufr_opt(ii, jj, :)) - (RSp_r_ufr_opt(r, jj, :)) ) /(4*df_MHz) *Np2dB ); % p_ufr x 1
+            
             X = z_ACS_cm(ii) - z_ACS_r_cm(r);
 
             y_temp(r, :) = y_col; %**
+            y_temp2(r, :) = y_col2;
             x_temp(r, :) = X; % **
 
         end
         x_temp_all{ii, jj} = x_temp;
         y_temp_all{ii, jj} = y_temp;
+        y_temp_all2{ii, jj} = y_temp2;
 
     end
 end
@@ -436,40 +531,243 @@ fprintf('Loop way Elapsed time %.2f \n', t);
 % NOW ESTIMATION CGS RFM
 
 a_rfm = zeros(m, n); 
+a_rfm2 = zeros(m, n); 
 for jj = 1:n  % Loop over lateral positions (x_j)
     for ii = 1:m  % Loop over depth positions (z_k)
 
         x_temp = x_temp_all{ii, jj};
         y_temp = y_temp_all{ii, jj};
+        y_temp2 = y_temp_all2{ii, jj};
 
         X_vec = x_temp(:);
-
         y_vec = y_temp(:);
-        a_rfm(ii, jj) = -(X_vec' * X_vec) \ (X_vec' * y_vec);
+        y_vec2 = y_temp2(:);
+
+        % % Option 1
+        % a_rfm(ii, jj) = -(X_vec' * X_vec) \ (X_vec' * y_vec);
+        % a_rfm(ii, jj) = abs((X_vec' * X_vec) \ (X_vec' * y_vec));
+        % 
+        % a_rfm2(ii, jj) = -(X_vec' * X_vec) \ (X_vec' * y_vec2);
+        % a_rfm2(ii, jj) = abs((X_vec' * X_vec) \ (X_vec' * y_vec2));
+
+
+        % % Option 2
+        A2_full    = kron(speye(p_ufr), x_temp(:, 1));
+        A2t_full   = A2_full';
+
+        slope_full = -(cgs(A2t_full*A2_full, A2t_full*y_vec));
+        slope2_full = -(cgs(A2t_full*A2_full, A2t_full*y_vec2));
+
+        % a_rfm(ii, jj) = mean(slope_full);
+        % a_rfm2(ii, jj) = mean(slope2_full);
+
+        a_rfm(ii, jj) = median(slope_full);
+        a_rfm2(ii, jj) = median(slope2_full);
+
+        % % Option 3 (INTERCEPT)
+
+        % A31_full   = kron( speye(p_ufr), x_temp(:, 1) );
+        % A32_full   = kron( speye(p_ufr), ones(size( x_temp(:, 1))) );
+        % A3_full    = horzcat(A31_full, A32_full);
+        % A3t_full   = A3_full';
+        % 
+        % x_opt = -cgs(A3t_full*A3_full, A3t_full*y_vec);
+        % slope_full = x_opt(1:end/2);
+        % 
+        % x2_opt = -cgs(A3t_full*A3_full, A3t_full*y_vec2);
+        % slope2_full = x2_opt(1:end/2);
+        % 
+        % a_rfm(ii, jj) = mean(slope_full);
+        % a_rfm2(ii, jj) = mean(slope2_full);
+        % 
+        % % a_rfm(ii, jj) = median(slope_full);
+        % % a_rfm2(ii, jj) = median(slope2_full);
+
+
+        % % Option 4 (LINEAR FIT)
+        % slope_fit_fx = zeros(1, p_ufr);
+        % slope_fit_fx2 = zeros(1, p_ufr);
+        % for pp = 1:p_ufr
+        %     [slope_fx, ~, ~, ~] = fit_linear(x_temp(:, pp), y_temp(:, pp), 2);
+        %     [slope_fx2, ~, ~, ~] = fit_linear(x_temp(:, pp), y_temp2(:, pp), 2);
+        %     slope_fit_fx(1,pp) =    -(slope_fx) ;
+        %     slope_fit_fx2(1,pp) =   -(slope_fx2) ;
+        % end
+        % a_rfm(ii, jj) = mean(slope_fit_fx);
+        % a_rfm2(ii, jj) = mean(slope_fit_fx2);
+        % 
+        % % a_rfm(ii, jj) = median(slope_fit_fx);
+        % % a_rfm2(ii, jj) = median(slope_fit_fx2);
+
+
     end
 end
 %
 % RFM
-[m_a, s_a, cv_a] = deal(calc2dStats{1}(a_rfm), calc2dStats{2}(a_rfm), calc2dStats{3}(a_rfm));
-caxis_acs = [0 1.1];
-fontSize = 14;
+[m_a, s_a, cv_a]    = deal(calc2dStats{1}(a_rfm), calc2dStats{2}(a_rfm), calc2dStats{3}(a_rfm));
+[m_a2, s_a2, cv_a2] = deal(calc2dStats{1}(a_rfm2), calc2dStats{2}(a_rfm2), calc2dStats{3}(a_rfm2));
+
+range_acs = [0 1.5];
+fact_transp = 0.7;
+fontSize = 15;
 
 figure, 
-imagesc(x_ACS, z_ACS * 1e3, a_rfm, caxis_acs); % Convert to mm
-
+imagesc(a_rfm, range_acs); % Convert to mm
+% % axis("image")
 colorbar; colormap("turbo")
-xlabel('Degree [º]');
-ylabel('Depth [mm]');
-hb2=colorbar; ylabel(hb2,'dB\cdotcm^{-1}\cdotMHz^{-1}')
-% title('Local Attenuation Coefficient');
-title(sprintf('RFM Local AC (GT= %.2f)\n%.3f $\\pm$ %.3f,  \\%%CV = %.2f', ...
-               alpha_gt, m_a, s_a, cv_a), ...
-      'Interpreter', 'latex');
-% axis("image")
+
+% figure('Units', 'pixels', 'Position', [100, 100, 800, 600]); % [x, y, width, height]
+% 
+% subplot(121)
+% imagesc(x_ACS * 1e3, z_ACS * 1e3, a_rfm, range_acs); % Convert to mm
+% % axis("image")
+% colorbar; colormap("turbo")
+% xlabel('Lateral [mm]');
+% ylabel('Depth [mm]');
+% hb2=colorbar; ylabel(hb2,'dB\cdotcm^{-1}\cdotMHz^{-1}')
+% title(sprintf('RFM %.3f$\\pm$%.3f, \\%%CV=%.2f', m_a, s_a, cv_a), ...
+%       'Interpreter', 'latex');
+% set(gca,'fontsize',fontSize)
+% 
+% subplot(122)
+% imagesc(x_ACS * 1e3, z_ACS * 1e3, a_rfm2, range_acs); % Convert to mm
+% % axis("image")
+% colorbar; colormap("turbo")
+% xlabel('Lateral [mm]');
+% ylabel('Depth [mm]');
+% hb2=colorbar; ylabel(hb2,'dB\cdotcm^{-1}\cdotMHz^{-1}')
+% title(sprintf('TNV-RFM %.3f$\\pm$%.3f, \\%%CV=%.2f', m_a2, s_a2, cv_a2), ...
+%       'Interpreter', 'latex');
+% set(gca,'fontsize',fontSize)
+
+
+
+xFull = SAM.x;
+zFull = SAM.z;
+[X,Z] = meshgrid(xFull, zFull);
+
+roi = X >= x_ACS(1) & X <= x_ACS(end) & Z >= z_ACS(1) & Z <= z_ACS(end);
+
+figure('Units', 'pixels', 'Position', [100, 100, 1200, 600]); % [x, y, width, height]
+
+tiledlayout(1, 3, 'TileSpacing','compact', 'Padding','compact')
+
+t1 = nexttile();
+imagesc(xFull,zFull*1e3, bmode_sam, range_bmode); % axis image;
+title('B-mode')
+% ylim(yLimits)
+hold on
+contour(xFull,zFull,roi,1,'w--')
+hold off
+xlabel('Lateral [°]')
+ylabel('Axial [mm]')
+hBm = colorbar('Ticks',-60:20:0);
+hBm.Label.String = 'dB';
+% hBm.Location = 'westoutside';
 set(gca,'fontsize',fontSize)
 
-%%
+nexttile,
+[~,hB,hColor] = imOverlayInterp(bmode_sam,a_rfm,range_bmode,range_acs,fact_transp,...
+    x_ACS,z_ACS*1e3,roi,xFull,zFull*1e3);
+title(sprintf('RFM %.3f$\\pm$%.3f, \\%%CV=%.2f', m_a, s_a, cv_a), ...
+      'Interpreter', 'latex');
+% title(sprintf('RFM: %.3f±%.3f, %%CV=%.2f', m_a, s_a, cv_a));
+% subtitle(['ACS = ',num2str(m_a,2),' dB/cm/MHz'])
+% colorbar off
+axis normal
+% ylim(yLimits)
+hold on
+contour(xFull,zFull*1e3,roi,1,'w--')
+hold off
+% axis off
+colorbar off
+xlabel('Lateral [°]')
+set(gca,'fontsize',fontSize)
+
+nexttile,
+[~,hB,hColor] = imOverlayInterp(bmode_sam,a_rfm2,range_bmode,range_acs,fact_transp,...
+    x_ACS,z_ACS*1e3,roi,xFull,zFull*1e3);
+title(sprintf('TNV-RFM %.3f$\\pm$%.3f, \\%%CV=%.2f', m_a2, s_a2, cv_a2), ...
+      'Interpreter', 'latex');
+% title(sprintf('TNV-RFM: %.3f±%.3f, %%CV=%.2f', m_a2, s_a2, cv_a2));
+% subtitle(['ACS = ',num2str(m_a,2),' dB/cm/MHz'])
+% colorbar off
+axis normal
+% ylim(yLimits)
+hold on
+contour(xFull,zFull*1e3,roi,1,'w--')
+hold off
+% axis off
+xlabel('Lateral [°]')
+hColor.Label.String = 'dB\cdotcm\cdotMHz^{-1}';
+% hColor.Label.String = 'dB/cm/MHz';
+colormap(t1,'gray')
+set(gca,'fontsize',fontSize)
+
+% SAVE FIG (RECT)
+% exportgraphics(gcf,fullfile(figsDir,samName(1:end-4)+"_rect.png"), ...
+%     'Resolution','300')
+
 keyboard
+%% Plot in cartesian cords
+xPolar  = SAM.xp;
+zPolar  = SAM.zp;
+z0Polar = SAM.z0p; 
+r0      = SAM.r0;
+r0 = 0.0401;
+
+fontSize = 30;
+roi = X >= x_ACS(3) & X <= x_ACS(end) & Z >= z_ACS(1) & Z <= z_ACS(end);
+
+[TH_acs,R_acs] = meshgrid(-x_ACS*pi/180 + pi/2,z_ACS + r0);
+[xPolarACS, zPolarACS] = pol2cart(TH_acs,R_acs);
+zPolarACS = zPolarACS + z0Polar;
+
+figure('Units','pixels', 'Position', [100, 100, 1200, 600]);
+[ax1,~] = imOverlayPolar(bmode_sam,a_rfm,range_bmode,range_acs,0.7, ...
+    xPolar,zPolar,xPolarACS,zPolarACS);
+% yticks(ax1,[4 8 12 16])
+title(ax1,sprintf('RFM %.3f$\\pm$%.3f, \\%%CV=%.2f', m_a, s_a, cv_a), ...
+      'Interpreter', 'latex');
+xlabel(ax1,'Lateral [cm]'), ylabel(ax1,'Axial [cm]')
+set(gca,'fontsize',fontSize)
+% xlim([-9 9]),
+% ylim([0 15])
+hold on
+contour(xPolar*1e2, (zPolar)*1e2, roi,1,'w--')
+hold off
+exportgraphics(gcf,fullfile(figsDir,samName(1:end-4)+"rfm_polar.png"), ...
+    'Resolution','300')
+
+
+figure('Units','pixels', 'Position', [100, 100, 1200, 600]);
+[ax1,~] = imOverlayPolar(bmode_sam,a_rfm2,range_bmode,range_acs,0.7, ...
+    xPolar,zPolar,xPolarACS,zPolarACS);
+% yticks(ax1,[4 8 12 16])
+title(ax1,sprintf('TNV-RFM %.3f$\\pm$%.3f, \\%%CV=%.2f', m_a2, s_a2, cv_a2), ...
+      'Interpreter', 'latex');
+xlabel(ax1,'Lateral [cm]'), ylabel(ax1,'Axial [cm]')
+set(gca,'fontsize',fontSize)
+% xlim([-9 9])
+% ylim([0 15])
+hold on
+contour(xPolar*1e2, (zPolar)*1e2, roi,1,'w--')
+hold off
+set(gca,'fontsize',fontSize)
+
+% SAVE FIG (RECT)
+% exportgraphics(gcf,fullfile(figsDir,samName(1:end-4)+"tnv_polar.png"), ...
+%     'Resolution','300')
+
+% close all,
+% pause(0.05);
+end
+
+
+%%
+% keyboard
+
+
 
 %% NOW ESTIMATION TNV
 
@@ -530,10 +828,11 @@ for jj = 1:n  % Loop over lateral positions (x_j)
 
         y_vec = y_temp1(:);
         a_rfm1(ii, jj) = -(X_vec' * X_vec) \ (X_vec' * y_vec);
+        a_rfm1(ii, jj) = abs((X_vec' * X_vec) \ (X_vec' * y_vec));
 
         y_vec = y_temp2(:);
         a_rfm2(ii, jj) = -(X_vec' * X_vec) \ (X_vec' * y_vec);
-
+        a_rfm2(ii, jj) = abs((X_vec' * X_vec) \ (X_vec' * y_vec));
         % a_rfm(ii, jj) = - cgs(X_vec' * X_vec, X_vec' * y_vec);
 
     end
@@ -686,7 +985,7 @@ A2 = kron( ones(size(band)) , speye(m*n) );
 
 %% FIGURES COMPARISON RFM VS SLD
 
-caxis_acs = [0 1.1];
+range_acs = [0 1.1];
 fontSize = 14;
 
 % ACS_SLD = ACS_RSLD;
@@ -697,7 +996,7 @@ set(gcf, 'Units', 'pixels', 'Position', [100, 100, 1000, 600]); % [x, y, width, 
 [m_a, s_a, cv_a] = deal(calc2dStats{1}(ACS_SLD), calc2dStats{2}(ACS_SLD), calc2dStats{3}(ACS_SLD));
 
 subplot(121)
-imagesc(x_ACS * 1e3, z_ACS * 1e3, ACS_SLD, caxis_acs); % Convert to mm
+imagesc(x_ACS * 1e3, z_ACS * 1e3, ACS_SLD, range_acs); % Convert to mm
 axis("image")
 colorbar; colormap("turbo")
 xlabel('Lateral [mm]');
@@ -713,7 +1012,7 @@ set(gca,'fontsize',fontSize)
 [m_a, s_a, cv_a] = deal(calc2dStats{1}(a_rfm), calc2dStats{2}(a_rfm), calc2dStats{3}(a_rfm));
 
 subplot(122)
-imagesc(x_ACS * 1e3, z_ACS * 1e3, a_rfm, caxis_acs); % Convert to mm
+imagesc(x_ACS * 1e3, z_ACS * 1e3, a_rfm, range_acs); % Convert to mm
 axis("image")
 colorbar; colormap("turbo")
 xlabel('Lateral [mm]');
@@ -1502,12 +1801,12 @@ fprintf('Elapsed time %.2f \n', t);
 
 [m_a, s_a, cv_a] = deal(calc2dStats{1}(a_local), calc2dStats{2}(a_local), calc2dStats{3}(a_local));
 
-caxis_acs = [0 1.1];
+range_acs = [0 1.1];
 fontSize = 14;
 
 figure;
 subplot(121)
-imagesc(x_ACS * 1e3, z_ACS * 1e3, a_local, caxis_acs); % Convert to mm
+imagesc(x_ACS * 1e3, z_ACS * 1e3, a_local, range_acs); % Convert to mm
 axis("image")
 colorbar; colormap("turbo")
 xlabel('Lateral [mm]');
