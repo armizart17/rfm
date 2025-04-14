@@ -1,225 +1,239 @@
-% ====================================================================== %
-% Script for clinical data.
-% Created on June 19th, 2024
-% Modification for RFM method EMZ
-% ====================================================================== %
-
-% reinit
-baseDir = 'D:\emirandaz\qus\data\liver\healthy';
-
-sampleDir = fullfile(baseDir,'samples');
-% refsDir = fullfile(baseDir,'refs','joined');
-resultsDir = 'D:\emirandaz\qus\rfm\tnv\healthyLiver';
-figsDir = 'D:\emirandaz\qus\rfm\tnv\healthyLiver';
-
-if ~exist(resultsDir) mkdir(resultsDir); end
-if ~exist(figsDir) mkdir(figsDir); end
-
-
-% acqDir = dir(fullfile(sampleDir,'016-03.mat')); %65*ma
-% acqDir = dir(fullfile(sampleDir,'007-05.mat')); %*ma
-% acqDir = dir(fullfile(sampleDir,'014-01.mat')); %*ma
-% acqDir = dir(fullfile(sampleDir,'016-06.mat')); %emz
-acqDir = dir(fullfile(sampleDir,'020-05.mat')); %dv
-
-%% FIRST UTILS
+% Reference Frequency Method vApril
+% Here I try a simulation with different mu_values for TNV method
+% Method by gpt and EMZ 
+clear all;
+% clear all, clc, close all;
+alpha_gt = NaN;
 manualroi = false;
 denTNVRFM = false;
 
 Np2dB       = 20*log10(exp(1));
 dB2Np       = 1/Np2dB;
 range_bmode = [-60 0];
+range_acs   = [0 1.2];
+fact_transp = 0.7;
+fontSize    = 15;
 
 mean2d = @(x) mean(x(:));
 std2d = @(x) std(x(:));
 cv2d = @(x) 100*std(x(:))/mean(x(:));
 
 calc2dStats = {@(x) mean(x(:)), @(x) std(x(:)), @(x) 100 * std(x(:)) / mean(x(:))};
-%%
-for iFile = 1:length(acqDir)
 
-% samName = sampleFiles(iFile).name(1:end-4);
-% fileName = fullfile(pathData, samName);
+%% LOAD SAM
 
-% iAcq = list_acqDir (iList);
-samName = acqDir(iFile).name(1:end-4);
-fileName = fullfile(sampleDir, samName);
+% DATA NEW AMZ
+% 
+
+% DATA LIM PC
+pathData = 'D:\emirandaz\qus\data\liver\bf_M04_D02';
+figsDir = 'D:\emirandaz\qus\data\liver\rfm_v2';
+
+if ~exist(figsDir) mkdir(figsDir); end
+
+acqDir = dir(fullfile(pathData,'*.mat'));
+
+list_acqDir = [1 2 5 6 7 8 9 11 12 15 16 17 18 20];
+list_acqDir = [ 1 ]; %1 6 11 15
+for iList = 1:length(list_acqDir)
+
+% Each 5
+% iAcq = 1;
+iAcq = list_acqDir (iList);
+samName = acqDir(iAcq).name;
+fileName = fullfile(pathData, samName);
+
+%%%%%%%%%%%%%%% NEW MARCH %%%%%%%%%%%%%%%
+SAM = load(fileName);
+%%%%%%%%%%%%%%% NEW MARCH %%%%%%%%%%%%%%%
+
+
+% B-MODE CHECK (PROBABLY NEED PADDING)
+% bmode_sam = db(hilbert(SAM.rf));
+% bmode_sam = bmode_sam - max(bmode_sam(:));
+
+bmode_sam   = SAM.bMode;
+SAM.x       = SAM.xr;
+SAM.z       = SAM.zr;
+
+caption = strrep(samName(1:end-4), '_', ' ');
+
+% figure,
+% imagesc(SAM.x, SAM.z*1E3, bmode_sam, range_bmode), 
+% xlabel('Degree [º]'), ylabel('Depth [mm]');
+% cb = colorbar;
+% cb.Label.String = 'dB'; % Add the label "dB"
+% title(caption)
+% % axis("image");
+% colormap('gray')
 
 %% SPECTRAL PARAMETERS
 pars.bw          = [1.2 3.9]; % [MHz]
 pars.overlap     = 0.8;
-pars.blocksize   = 10; % wavelengths
-pars.blocklines  = 8;
+pars.blocksize   = 11; % wavelengths
+pars.blocklines  = 6;
 pars.saran_layer = false;
 pars.ratio_zx    = 1;
 pars.window_type = 3; %  (1) Hanning, (2) Tuckey, (3) Hamming, (4) Tchebychev
 
-blocksize_wv_r = 18;
+blocksize_wv_r = 24;
 
-fprintf('ID N° %d : %s\n', iFile, samName(1:end-4));
+%% ROI SELECTION (I DID 14 cases)
 
-%% Loading file and variables
-load(fullfile(sampleDir,samName+".mat"));
-fprintf("Loading sample %s \n", samName)
-RcvData = cell2mat(RcvData);
-n_frame = size(RcvData,3); % Frame selector
-RcvData = RcvData(:, :, n_frame); % Select frame of RF Data
+fprintf('ID N° %d : %s\n', iAcq, samName(1:end-4));
 
-% Additional variables
-central_freq = Receive(1).demodFrequency*1e6; % Central frequency of pulse
-fs = Receive(1).decimSampleRate*1e6; % According to "NS200BW" Acquisition Mode
-n_pulses = P.numRays; % number of pulses
-n_elements = Trans.numelements; % number of transducer elements
-num_samples = Receive(1).endSample - Receive(1).startSample +1; % samples per channel
-sound_speed = Resource.Parameters.speedOfSound; % [m/s]
-wvl = sound_speed/central_freq; % [m] wavelength in meters
-scalemm2wvl = 1/wvl;
+if ( strcmp(samName(1:end-4), '42460445_IHR_F') )
+% pars.z_roi = [0.0534482412002264 0.0965834129422875];
+% pars.x_roi = [-23.5124207044383 -2.87523485999935];
 
-% Initialize variables
-rf_channel = zeros(num_samples , n_elements, n_pulses);
-rx_apods = zeros(1, n_elements, n_pulses);
-rf = zeros(num_samples, n_pulses);
+% pars.z_roi = [0.0464482412002264 0.0965834129422875];
+% pars.x_roi = [-24.0124207044383 -2.87523485999935];
 
-% Organize data
-for n = 1:n_pulses % Iterate through pulses
-    rf_channel(:, :, n) = RcvData(Receive(n).startSample:Receive(n).endSample, :);
-end
+% ORIGINAL
+pars.z_roi = [0.0564482412002264 0.0965834129422875]; % 0.0401
+pars.x_roi = [-24.4124207044383 -2.67523485999935]; % 21.73
 
+% pars.z_roi = [0.0534 0.0965];
+% pars.x_roi = [-24.412 -2.375];
+% 
+% pars.z_roi = [55.05 96.5]*1e-3;
+% pars.x_roi = [-24.412 -2.375];
+% BIG IUS SIMILAR SIZE HEALTHY (DEPRECATED)
+% Diff z_roi = 0.0462
+% Diff x_roi = 29.75
+% pars.x_roi = [-27.41   -2.2198];
+% pars.z_roi = [0.050    0.0985];
 
-% Acommodate to time delays and rf signals
-focus = 20/1000;
-t = (0:(num_samples-1))/fs; % [sec.] time domain 0:T:(N_sample-1)*T
-[rx_delays] = getRXDelays(Trans, t, n_elements, n_pulses, sound_speed, wvl);
+elseif ( strcmp(samName(1:end-4), '42460445_IOLAI_F') )
+pars.z_roi = [0.06265 0.13];
+pars.x_roi = [-27 -5.8];
 
+elseif ( strcmp(samName(1:end-4), '42460445_PL_F') )
+pars.z_roi = [0.04765518886002839 0.0887218844567291];
+pars.x_roi = [-20.3157416733283 1.23992789555525];
 
-% Dynamic Aperture
-f_num = 3;
-z = sound_speed*t/2;
-elem_pitch = Trans.spacingMm*1e-3;
-maxAprSz = 32;
-dyn_aperture = zeros(length(z), n_elements, n_pulses);
-for n = 1:n_pulses
-    for z_i = 1:length(z)
-        a = z(z_i)/(2*f_num);
-        hlfAprSz = floor(a / elem_pitch);
-        if (hlfAprSz > maxAprSz/2)
-            hlfAprSz = floor(maxAprSz / 2);
+elseif ( strcmp(samName(1:end-4), '44730576_IHR_F') )
+pars.z_roi = [0.0432077721719176 0.0787915326854975];
+pars.x_roi = [-25.0846951177715 3.52902554888802];
+
+% pars.z_roi = [0.023802428576483 0.0705162395428045];
+% pars.x_roi = [-22.2233230511056 10.587076646664];
+
+elseif ( strcmp(samName(1:end-4), '44730576_IOLAI_F') )
+pars.z_roi = [0.0361737730006286 0.0638960050286501];
+pars.x_roi = [-8.10722085555353 18.9804347088842];
+
+elseif ( strcmp(samName(1:end-4), '44730576_LCM_F') )
+pars.z_roi = [0.0456903601147255 0.074653886114151];
+pars.x_roi = [-15.3560300911073 9.0610115444422];
+
+% pars.z_roi = [0.0448628308004562 0.0684474162571313];
+% pars.x_roi = [-13.44844871333 10.2055603711086];
+
+elseif ( strcmp(samName(1:end-4), '44730576_LHI_F') )
+pars.z_roi = [0.0485867127146681 0.0763089447426896];
+pars.x_roi = [-21.4602904999946 4.6735743755544];
+
+elseif ( strcmp(samName(1:end-4), '70141854_IHR_F') )
+pars.z_roi = [0.0319664782005137 0.0771364740569589];
+pars.x_roi = [-17.4543696066623 12.8761742999968];
+
+% pars.z_roi = [0.0382425962863018 0.0643097696857848];
+% pars.x_roi = [-13.2576905755522 18.0266440199955];
+
+elseif ( strcmp(samName(1:end-4), '70141854_IOLAI_F') )
+pars.z_roi = [0.0419664782005137 0.0920320017138063];
+pars.x_roi = [-13.6392068511077 11.350109197775];
+
+elseif ( strcmp(samName(1:end-4), '70141854_PL_F') ) % (BESSELS)
+pars.z_roi = [0.0440353014861869 0.091204472399537];
+pars.x_roi = [-8.10722085555353 22.7955974644388];
+
+elseif ( strcmp(samName(1:end-4), '70897309_IHR_F') ) 
+pars.z_roi = [0.0382425962863018 0.0725850628284778];
+pars.x_roi = [-24.7031788422161 0.476895344444337];
+
+elseif ( strcmp(samName(1:end-4), '70897309_IOLAI_F') ) % LIKE IT
+pars.z_roi = [0.042794007514783 0.0870668258281905];
+pars.x_roi = [-18.5989184333287 11.5408673355527];
+
+elseif ( strcmp(samName(1:end-4), '70897309_LCM_F') ) 
+pars.z_roi = [0.0560344765430918 0.120581763056097];
+pars.x_roi = [-25.2754532555492 -1.81220230888842];
+
+elseif ( strcmp(samName(1:end-4), '70897309_PL_F') ) 
+pars.z_roi = [0.0432077721719176 0.112720234570539];
+pars.x_roi = [-28.7090997355484 -5.62736506444304];
+
+else 
+
+    figure('Units','centimeters', 'Position',[5 5 15 15]),
+    imagesc(SAM.x, SAM.z*1E3,bmode_sam,range_bmode);
+    colormap gray; clim(range_bmode);
+    hb2=colorbar; ylabel(hb2,'dB')
+    xlabel('Lateral [mm]'), ylabel('Depth [mm]'); 
+    title(caption)
+
+    confirmation = '';
+    while ~strcmp(confirmation,'Yes')
+        rect = getrect;
+        confirmation = questdlg('Sure?');
+        if strcmp(confirmation,'Cancel')
+            disp(rect)
+            break
         end
-        a_i = -hlfAprSz: hlfAprSz;    % aperture indices
-        fulAprSz = 2*hlfAprSz + 1;
-        aper_center = n;
-        aper = aper_center + a_i;
-        aper = aper(aper>=1);
-        aper = aper(aper<=128);
-        dyn_aperture(z_i, aper, n) = 1;
     end
+    close,
+
+    pars.x_roi     = [rect(1), rect(1)+rect(3)];      % [º]
+    pars.z_roi     = [rect(2), rect(2)+rect(4)]*1E-3; % [m]
+    continue;
+
 end
-
-
-%% Beamforming
-
-% Delay-and-sum
-for n = 1:n_pulses
-    % Delaying
-    for e = 1:n_elements
-        % rx_apods(e, n);
-        rf_channel(:, e, n) = ...
-            interp1(t, rf_channel(:, e, n), rx_delays(:,e, n), 'linear', 0);
-    end
-    rf_channel(:, :, n) = rf_channel(:, :, n) .* dyn_aperture(:, :, n);
-    % Summing
-    rf(:, n) = sum(rf_channel(:, :, n), 2);
-end
-
-%% B-Mode and coordinates
-b_mode = 20*log10(abs(hilbert(rf)));
-b_mode = b_mode-max(b_mode(:));
-
-param = getparam('C5-2v');
-siz = size(rf);
-z = sound_speed*t/2;
-zmax = z(end);
-R = param.radius;
-p = param.pitch;
-N = param.Nelements;
-L = 2*R*sin(asin(p/2/R)*(N-1)); % chord length
-d = sqrt(R^2-L^2/4); % apothem
-z0 = -d;
-
-th = -(linspace(atan2(L/2,d),atan2(-L/2,d),siz(2)))*180/pi;
-r = linspace(R+p,-z0+zmax,siz(1));
-
-% To Polar Coordinates
-[xPolar,zPolar, z0Polar] = impolgrid(size(b_mode), z(end),param);
 
 %%
-BmodeFull = db(hilbert(rf));
-BmodeFull = BmodeFull - max(BmodeFull(:));
-caption = samName;
+if manualroi 
+figure('Units','centimeters', 'Position',[5 5 15 15]),
+imagesc(SAM.x, SAM.z*1E3,bmode_sam,range_bmode);
+colormap gray; clim(range_bmode);
+hb2=colorbar; ylabel(hb2,'dB')
+xlabel('Lateral [mm]'), ylabel('Depth [mm]'); 
+title(caption)
+
+confirmation = '';
+while ~strcmp(confirmation,'Yes')
+    rect = getrect;
+    confirmation = questdlg('Sure?');
+    if strcmp(confirmation,'Cancel')
+        disp(rect)
+        break
+    end
+end
+close,
+
+pars.x_roi     = [rect(1), rect(1)+rect(3)];      % [º]
+pars.z_roi     = [rect(2), rect(2)+rect(4)]*1E-3; % [m]
+end
+% CHECK ROI
+
 % figure,
-% set(gcf, 'Units', 'pixels', 'Position', [100, 100, 600, 600]); % [x, y, width, height]
-% pcolor(xPolar*1e3, zPolar*1e3, BmodeFull);
-% shading interp
-% cbar = colorbar;
-% ylabel(cbar, 'dB', 'FontSize', 12);
-% clim([-70 0]);
-% colormap gray               
-% ylabel('Depth [mm]', 'FontSize', 14);
-% xlabel('Lateral [mm]', 'FontSize', 14);
-% axis equal ij tight
-% title(caption, 'FontSize', 14);
-% set(gca, 'Color', 'k');  % axes background
-
-
-%% Selecting ROI
-
-xFull = th; % [deg]
-r0 = r(1);
-zFull = (r-r0)*1e2; % [cm]
-
-SAM.z = zFull*1e-2; % to [m]
-SAM.x = xFull;
-SAM.fs = fs;
-SAM.rf = rf;
-SAM.bMode = BmodeFull;
-bmode_sam   = SAM.bMode;
-
-%%
-% figure('Units','centimeters', 'Position',[5 5 15 15]),
-% imagesc(xFull,SAM.z*1e3,BmodeFull,range_bmode);
-% % ylim([0 10])
-% colormap gray; clim(range_bmode);
+% imagesc(SAM.x, SAM.z*1E3, bmode_sam,range_bmode), 
 % hb2=colorbar; ylabel(hb2,'dB')
-% xlabel('Lateral [º]'), ylabel('Depth [mm]'); 
-% % title(caption)
-% 
-% confirmation = '';
-% while ~strcmp(confirmation,'Yes')
-%     rect = getrect;
-%     confirmation = questdlg('Sure?');
-%     if strcmp(confirmation,'Cancel')
-%         disp(rect)
-%         break
-%     end
-% end
-% close,
-% 
-% pars.x_roi     = [rect(1), rect(1)+rect(3)];      % [º]
-% pars.z_roi     = [rect(2), rect(2)+rect(4)]*1E-3; % [m]
+% rectangle('Position', [pars.x_roi(1) 1E3*pars.z_roi(1) pars.x_roi(2)-pars.x_roi(1) 1E3*(pars.z_roi(2)-pars.z_roi(1))], ...
+%         'EdgeColor','r', 'LineWidth', 2, 'LineStyle','--'), hold off;
+% xlabel('Lateral [º]'), 
+% ylabel('Depth [mm]');
+% title(caption)
+% % axis("image");
+% colormap('gray')
 
-pars.x_roi = [1.0492   30.8074];
-pars.z_roi = [0.0415    0.0877];
-%%
+% (Remove later is to check roi)
 
-% fprintf('ID N° %d : %s\n', iFile, samName);
-% 
-% if ( strcmp(samName, '020-04') )
-%     pars.x_roi = [-15.3560 12.8762];
-%     pars.z_roi = [0.0398 0.0776];
-% 
-% end
-%%
+% % fprintf('==========(ROI)===========\n')
+% fprintf('Axial [mm] = %s;\n', mat2str(round(1e3*pars.z_roi,2)));
+% fprintf('Lateral [°] = %s;\n', mat2str(round(pars.x_roi,2)));
 
+%
 % RFM V1 
 % Reading experiment settings parameters
 bw              = pars.bw;
@@ -348,7 +362,6 @@ end
 RSp_k = zeros(m,n,NFFT);
 RSp_k(:,:, 2:end) = Sp_k(:,:, 2:end) ./ Sp_k(:,:, 1:end-1); 
 % clear Sp_k
-% For the first slice, keep the ratio the same as the first slice
 RSp_k(:,:, 1) = RSp_k(:,:, 2); % Assuming the first slice ratios are 1 as there is no "i-1"
 
 RSp_k = log(RSp_k); % @@
@@ -414,7 +427,6 @@ end
 RSp_r = zeros(m_r,n,NFFT);
 RSp_r(:,:, 2:end) = Sp_r(:,:, 2:end) ./ Sp_r(:,:, 1:end-1); 
 % clear Sp_r
-% For the first slice, keep the ratio the same as the first slice
 RSp_r(:,:, 1) = RSp_r(:,:, 2); % Assuming the first slice ratios are 1 as there is no "i-1"
 
 RSp_r = log(RSp_r); % @@
@@ -435,10 +447,10 @@ RSp_r_ufr   = RSp_r(:,:,range);
 
 %
 % DENOISING TNV RSP
-mu          = 1.5;
-tau         = 0.0100;
+mu          = 1.15;
+tau         = 0.01000;
 maxIter     = 1000;
-stableIter  = 20;
+stableIter  = 50;
 % tol         = 0.5e-4; % tolerance error
 tol         = 1e-3; % tolerance error
 RSp_k_ufr_vec = reshape(RSp_k_ufr, [], size(RSp_k_ufr, 3));   
@@ -448,43 +460,15 @@ mux_RSp = 1./(abs(mean(RSp_k_ufr_vec, 1, 'omitnan')) ./ std(RSp_k_ufr_vec, 0, 1,
 weigthChannels = ones(1, p_ufr);
  
 % gamma = 1;
-% vec_gamma = 1 + (10 - 1) * (1 - linspace(0, 1, p_ufr).^gamma);
+% vec_gamma = 1 + (1.1- 1) * (1 - linspace(0, 1, p_ufr).^gamma);
 % vec_log = logspace(log10(10), log10(1), p_ufr);
 % figure, plot(vec_gamma)
-
+% 
 % weigthChannels = vec_gamma;
 
 [RSp_k_ufr_opt, cost, error, fid, reg] = pdo_den_wtnv(RSp_k_ufr, mu, tau, maxIter, tol, stableIter, weigthChannels);
 
 [RSp_r_ufr_opt, cost, error, fid, reg] = pdo_den_wtnv(RSp_r_ufr, mu, tau, maxIter, tol, stableIter, weigthChannels);
-
-% Plot settings
-% rows = 3; cols = 5;
-% total_plots = rows * cols;
-% l_Rps = round(linspace(1, length(band_ufr), total_plots));
-% 
-% % ORIGINAL
-% figure;
-% t = tiledlayout(rows, cols, 'Padding', 'compact', 'TileSpacing', 'compact');
-% for i = 1:total_plots
-%     slice_idx = l_Rps(i);
-%     nexttile;
-%     imagesc(RSp_k_ufr(:, :, slice_idx));
-%     axis off;
-%     title(['RSp ', num2str(round(band_ufr(slice_idx),2)), 'MHz']);
-% end
-% 
-% % TNV
-% figure;
-% t = tiledlayout(rows, cols, 'Padding', 'compact', 'TileSpacing', 'compact');
-% for i = 1:total_plots
-%     slice_idx = l_Rps(i);
-%     nexttile;
-%     imagesc(RSp_k_ufr_opt(:, :, slice_idx));
-%     axis off;
-%     title(['TNV RSp ', num2str(round(band_ufr(slice_idx),2)), 'MHz']);
-% end
-% RFM METHOD
 
 % Convert depth values to cm
 z_ACS_cm = z_ACS * 1e2;      % Convert from meters to cm
@@ -545,22 +529,22 @@ for jj = 1:n  % Loop over lateral positions (x_j)
         y_vec2 = y_temp2(:);
 
         % % Option 1
-        % a_rfm(ii, jj) = -(X_vec' * X_vec) \ (X_vec' * y_vec);
+        a_rfm(ii, jj) = -(X_vec' * X_vec) \ (X_vec' * y_vec);
         % a_rfm(ii, jj) = abs((X_vec' * X_vec) \ (X_vec' * y_vec));
         % 
-        % a_rfm2(ii, jj) = -(X_vec' * X_vec) \ (X_vec' * y_vec2);
+        a_rfm2(ii, jj) = -(X_vec' * X_vec) \ (X_vec' * y_vec2);
         % a_rfm2(ii, jj) = abs((X_vec' * X_vec) \ (X_vec' * y_vec2));
 
 
         % % Option 2
-        A2_full    = kron(speye(p_ufr), x_temp(:, 1));
-        A2t_full   = A2_full';
-
-        slope_full = -(cgs(A2t_full*A2_full, A2t_full*y_vec));
-        slope2_full = -(cgs(A2t_full*A2_full, A2t_full*y_vec2));
-
-        a_rfm(ii, jj) = mean(slope_full);
-        a_rfm2(ii, jj) = mean(slope2_full);
+        % A2_full    = kron(speye(p_ufr), x_temp(:, 1));
+        % A2t_full   = A2_full';
+        % 
+        % slope_full = -(cgs(A2t_full*A2_full, A2t_full*y_vec));
+        % slope2_full = -(cgs(A2t_full*A2_full, A2t_full*y_vec2));
+        % 
+        % a_rfm(ii, jj) = mean(slope_full);
+        % a_rfm2(ii, jj) = mean(slope2_full);
 
         % a_rfm(ii, jj) = median(slope_full);
         % a_rfm2(ii, jj) = median(slope2_full);
@@ -604,45 +588,13 @@ for jj = 1:n  % Loop over lateral positions (x_j)
     end
 end
 %
-%% RFM
+% RFM
 [m_a, s_a, cv_a]    = deal(calc2dStats{1}(a_rfm), calc2dStats{2}(a_rfm), calc2dStats{3}(a_rfm));
 [m_a2, s_a2, cv_a2] = deal(calc2dStats{1}(a_rfm2), calc2dStats{2}(a_rfm2), calc2dStats{3}(a_rfm2));
 
-range_acs = [0 1.5];
-fact_transp = 0.7;
-fontSize = 15;
-% 
-% figure, 
-% imagesc(a_rfm, range_acs); % Convert to mm
-% % % axis("image")
-% colorbar; colormap("turbo")
 
-% figure('Units', 'pixels', 'Position', [100, 100, 800, 600]); % [x, y, width, height]
-% 
-% subplot(121)
-% imagesc(x_ACS * 1e3, z_ACS * 1e3, a_rfm, range_acs); % Convert to mm
-% % axis("image")
-% colorbar; colormap("turbo")
-% xlabel('Lateral [mm]');
-% ylabel('Depth [mm]');
-% hb2=colorbar; ylabel(hb2,'dB\cdotcm^{-1}\cdotMHz^{-1}')
-% title(sprintf('RFM %.3f$\\pm$%.3f, \\%%CV=%.2f', m_a, s_a, cv_a), ...
-%       'Interpreter', 'latex');
-% set(gca,'fontsize',fontSize)
-% 
-% subplot(122)
-% imagesc(x_ACS * 1e3, z_ACS * 1e3, a_rfm2, range_acs); % Convert to mm
-% % axis("image")
-% colorbar; colormap("turbo")
-% xlabel('Lateral [mm]');
-% ylabel('Depth [mm]');
-% hb2=colorbar; ylabel(hb2,'dB\cdotcm^{-1}\cdotMHz^{-1}')
-% title(sprintf('TNV-RFM %.3f$\\pm$%.3f, \\%%CV=%.2f', m_a2, s_a2, cv_a2), ...
-%       'Interpreter', 'latex');
-% set(gca,'fontsize',fontSize)
-
-%
-
+% VISUALIZATION RECT
+fontSize = 14;
 xFull = SAM.x;
 zFull = SAM.z;
 [X,Z] = meshgrid(xFull, zFull);
@@ -655,7 +607,6 @@ tiledlayout(1, 3, 'TileSpacing','compact', 'Padding','compact')
 
 t1 = nexttile();
 imagesc(xFull,zFull*1e3, bmode_sam, range_bmode); % axis image;
-% title('B-mode')
 title(['Bmode k', mat2str(round(pars.blocksize,2)), ...
     'r', mat2str(round(blocksize_wv_r,2)), ...
     'L', mat2str(round(pars.blocklines,2))])
@@ -712,12 +663,10 @@ set(gca,'fontsize',fontSize)
 % exportgraphics(gcf,fullfile(figsDir,samName(1:end-4)+"_rect.png"), ...
 %     'Resolution','300')
 
-% keyboard
+keyboard
 
-%
 %% MULTI PREV TEST
-
-dirMulti = ['D:\emirandaz\qus\rfm\IUS2025\HL\multil_',num2str(pars.blocklines),'vIUS'];
+dirMulti = ['D:\emirandaz\qus\rfm\IUS2025\FL\multil_',num2str(pars.blocklines)];
 if ~exist(dirMulti) mkdir(dirMulti); end
 
 % ['Bmode k', mat2str(round(pars.blocksize,2)), ...
@@ -727,100 +676,95 @@ save_all_figures_to_directory(dirMulti,char("M"+pars.blocksize+"fig"))
 close all
 
 %%
- dirOut = 'D:\emirandaz\qus\rfm\IUS2025\abstract\hl';
+dirOut = 'D:\emirandaz\qus\rfm\IUS2025\abstract\fl';
 if ~exist(dirOut) mkdir(dirOut); end
 
-%% Plot RFM
 
-% [xPolar,zPolar, z0Polar] = impolgrid(size(b_mode), z(end),param);
-
-[X,Z] = meshgrid(xFull, zFull);
-% r0      = SAM.r0;
-r0 = 0.0501;
+%% Plot in cartesian cords
+% Plot RFM
+xPolar  = SAM.xp;
+zPolar  = SAM.zp;
+z0Polar = SAM.z0p; 
+r0      = SAM.r0;
+r0 = 0.0401;
+fact_transp = 0.45;
 
 fontSize = 26;
-roi = X >= x_ACS(3) & X <= x_ACS(end) & Z >= z_ACS(1) & Z <= z_ACS(end);
 
-[TH_acs,R_acs] = meshgrid(-x_ACS*pi/180 + pi/2,z_ACS + r0);
+
+roi = X >= x_ACS(1) & X <= x_ACS(end) & Z >= z_ACS(1) & Z <= z_ACS(end);
+
+% x_ACS2 = x_ACS;
+% x_ACS2(1) = x_ACS(1)-0.1;
+
+% z_ACS2 = z_ACS;
+% z_ACS2(1) = z_ACS(1)-0.1;
+
+x_ACS2 = linspace(x_ACS(1)-0.1, x_ACS(end)+0.1, length(x_ACS))';
+z_ACS2 = linspace(z_ACS(1)-0.0007, z_ACS(end)+0.0007, length(z_ACS))';
+
+% [TH_acs,R_acs] = meshgrid(-x_ACS*pi/180 + pi/2,z_ACS + r0);
+[TH_acs,R_acs] = meshgrid(-x_ACS2*pi/180 + pi/2,z_ACS2 + r0);
+
 [xPolarACS, zPolarACS] = pol2cart(TH_acs,R_acs);
 zPolarACS = zPolarACS + z0Polar;
-
-fontSize = 26;
-% roi = X >= x_ACS(3) & X <= x_ACS(end) & Z >= z_ACS(1) & Z <= z_ACS(end);
 
 
 figure('Units','pixels', 'Position', [100, 100, 1200, 600]);
 
-% [ax1,~] = imOverlayPolar(bmode_sam,a_rfm,[-62.5 0],range_acs,0.7, ...
-%     xPolar,zPolar,xPolarACS,zPolarACS);
-[ax1,~] = imOverlayPolar(bmode_sam,a_rfm,range_bmode,range_acs,0.7, ...
+[ax1,~] = imOverlayPolar(bmode_sam,a_rfm,range_bmode,range_acs,fact_transp, ...
     xPolar,zPolar,xPolarACS,zPolarACS);
 
-title(ax1, sprintf('RFM: %.3f ± %.3f, CV=%.2f%%', m_a, s_a, cv_a));
+title(ax1, sprintf('RFM: %.2f ± %.2f, CV=%.2f%%', m_a, s_a, cv_a));
 xlabel(ax1, 'Lateral [cm]');
 ylabel(ax1, 'Axial [cm]');
 set(ax1, 'FontSize', fontSize);
-colorbar off
-ylim([0 17])
-xlim([-11.3 11.3])
+ylim([-1 17])
+xlim([-12 12])
 hold on;
 % contour(xPolar*1e2, zPolar*1e2, roi, 1, 'w--');
 % hb2=colorbar; ylabel(hb2,'dB\cdotcm\cdotMHz^{-1}', 'FontSize', fontSize)
 
 % Add label box "FL"
-annotation('textbox', [0.28, 0.795, 0.05, 0.10], 'String', 'HL', ...
+annotation('textbox', [0.28, 0.785, 0.05, 0.10], 'String', 'FL', ...
     'EdgeColor', 'w', 'BackgroundColor', 'k', 'Color', 'w','FontSize', fontSize+6, ...
     'FontWeight', 'bold', 'HorizontalAlignment', 'center');
 hold off;
 set(ax1,'fontsize',fontSize)
 
-exportgraphics(gcf,fullfile(dirOut,samName(1:end-4)+"_pol.png"), ...
-    'Resolution','300')
 
+% exportgraphics(gcf,fullfile(dirOut,samName(1:end-4)+"_pol.png"), ...
+%     'Resolution','300')
 % Plot TNV-RFM
 figure('Units','pixels', 'Position', [100, 100, 1200, 600]);
 
-% [ax2, ~] = imOverlayPolar(bmode_sam, a_rfm2, [-62.5 0], range_acs, 0.7, ...
-    % xPolar, zPolar, xPolarACS, zPolarACS);
-[ax2, ~] = imOverlayPolar(bmode_sam, a_rfm2, range_bmode, range_acs, 0.7, ...
+[ax2, ~] = imOverlayPolar(bmode_sam, a_rfm2, range_bmode, range_acs, fact_transp, ...
     xPolar, zPolar, xPolarACS, zPolarACS);
 
-title(ax2, sprintf('TNV-RFM: %.3f ± %.3f, CV=%.2f%%', m_a2, s_a2, cv_a2));
+title(ax2, sprintf('TNV-RFM: %.2f ± %.2f, CV=%.2f%%', m_a2, s_a2, cv_a2));
 xlabel(ax2, 'Lateral [cm]');
 % ylabel(ax2, 'Axial [cm]');
 set(ax2, 'FontSize', fontSize);
-ylim([0 17])
-xlim([-11.3 11.3])
+ylim([-1 17])
+xlim([-12 12])
 hold on;
 % contour(xPolar*1e2, zPolar*1e2, roi, 1, 'w--');
 % hb2=colorbar; ylabel(hb2,'dB\cdotcm\cdotMHz^{-1}', 'FontSize', fontSize)
+
 % Add label box "FL"
-annotation('textbox', [0.28, 0.795, 0.05, 0.10], 'String', 'HL', ...
+annotation('textbox', [0.28, 0.785, 0.05, 0.10], 'String', 'FL', ...
     'EdgeColor', 'w', 'BackgroundColor', 'k', 'Color', 'w','FontSize', fontSize+6, ...
     'FontWeight', 'bold', 'HorizontalAlignment', 'center');
 hold off;
 set(ax2,'fontsize',fontSize)
 
-exportgraphics(gcf,fullfile(dirOut,samName(1:end-4)+"_polTNV.png"), ...
-    'Resolution','300')
+% exportgraphics(gcf,fullfile(dirOut,samName(1:end-4)+"_polTNV.png"), ...
+%     'Resolution','300')
 end
 
-function t_delay = getRXDelays(Trans, t, n_elements, n_pulses, sound_speed, wvl)
 
-t_delay = zeros(length(t), n_elements, n_pulses);
-% (x, z) [m] Obtain positions of center of every element
-element_pos_x = Trans.ElementPos(:, 1)*wvl;
-element_pos_z = Trans.ElementPos(:, 3)*wvl;
-phi = Trans.ElementPos(:, 4);
+%%
+% keyboard
 
-for n = 1:n_pulses
-    for e = 1:n_elements
-        focus = sound_speed*t(:)/2;
-        xfocus = element_pos_x(n) + sin(phi(n)) * focus;
-        zfocus = element_pos_z(n) + cos(phi(n)) * focus;
-        t_delay(:,e,n) = (focus + sqrt((zfocus- element_pos_z(e)).^2 + ...
-            (xfocus - element_pos_x(e)).^2))/sound_speed;
-    end
-end
 
-end
+

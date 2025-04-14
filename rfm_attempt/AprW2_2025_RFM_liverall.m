@@ -73,7 +73,7 @@ pars.saran_layer = false;
 pars.ratio_zx    = 1;
 pars.window_type = 3; %  (1) Hanning, (2) Tuckey, (3) Hamming, (4) Tchebychev
 
-blocksize_wv_r = 16;
+blocksize_wv_r = 18;
 
 %% ROI SELECTION (I DID 14 cases)
 
@@ -716,7 +716,7 @@ z0Polar = SAM.z0p;
 r0      = SAM.r0;
 r0 = 0.0401;
 
-fontSize = 30;
+fontSize = 24;
 roi = X >= x_ACS(3) & X <= x_ACS(end) & Z >= z_ACS(1) & Z <= z_ACS(end);
 
 [TH_acs,R_acs] = meshgrid(-x_ACS*pi/180 + pi/2,z_ACS + r0);
@@ -724,36 +724,49 @@ roi = X >= x_ACS(3) & X <= x_ACS(end) & Z >= z_ACS(1) & Z <= z_ACS(end);
 zPolarACS = zPolarACS + z0Polar;
 
 figure('Units','pixels', 'Position', [100, 100, 1200, 600]);
+
+
+% tiledlayout(1, 2, 'TileSpacing','compact', 'Padding','compact')
+
+% nexttile,
 [ax1,~] = imOverlayPolar(bmode_sam,a_rfm,range_bmode,range_acs,0.7, ...
     xPolar,zPolar,xPolarACS,zPolarACS);
 % yticks(ax1,[4 8 12 16])
-title(ax1,sprintf('RFM %.3f$\\pm$%.3f, \\%%CV=%.2f', m_a, s_a, cv_a), ...
-      'Interpreter', 'latex');
+% title(ax1,sprintf('RFM %.3f$\\pm$%.3f, \CV=%.2f%%', m_a, s_a, cv_a), ...
+%       'Interpreter', 'latex');
+title(ax1,sprintf('RFM %.3f ± %.3f, CV=%.2f%%', m_a, s_a, cv_a));
 xlabel(ax1,'Lateral [cm]'), ylabel(ax1,'Axial [cm]')
-set(gca,'fontsize',fontSize)
+
 % xlim([-9 9]),
 % ylim([0 15])
 hold on
 contour(xPolar*1e2, (zPolar)*1e2, roi,1,'w--')
+% hb2=colorbar; ylabel(hb2,'dB\cdotcm\cdotMHz^{-1}', 'FontSize', fontSize)
 hold off
-exportgraphics(gcf,fullfile(figsDir,samName(1:end-4)+"rfm_polar.png"), ...
-    'Resolution','300')
+set(ax1,'fontsize',fontSize)
+% exportgraphics(gcf,fullfile(figsDir,samName(1:end-4)+"rfm_polar.png"), ...
+%     'Resolution','300')
 
 
 figure('Units','pixels', 'Position', [100, 100, 1200, 600]);
+% nexttile,
 [ax1,~] = imOverlayPolar(bmode_sam,a_rfm2,range_bmode,range_acs,0.7, ...
     xPolar,zPolar,xPolarACS,zPolarACS);
+colorbar
 % yticks(ax1,[4 8 12 16])
-title(ax1,sprintf('TNV-RFM %.3f$\\pm$%.3f, \\%%CV=%.2f', m_a2, s_a2, cv_a2), ...
-      'Interpreter', 'latex');
-xlabel(ax1,'Lateral [cm]'), ylabel(ax1,'Axial [cm]')
+% title(ax1,sprintf('TNV-RFM %.3f$\\pm$%.3f, \\%%CV=%.2f', m_a2, s_a2, cv_a2), ...
+%       'Interpreter', 'latex');
+title(ax1,sprintf('TNV-RFM %.3f ± %.3f, CV=%.2f%%', m_a2, s_a2, cv_a2));
+xlabel(ax1,'Lateral [cm]'),
+% ylabel(ax1,'Axial [cm]')
 set(gca,'fontsize',fontSize)
 % xlim([-9 9])
-% ylim([0 15])
+% ylim([0 12])
 hold on
 contour(xPolar*1e2, (zPolar)*1e2, roi,1,'w--')
+hb2=colorbar; ylabel(hb2,'dB\cdotcm\cdotMHz^{-1}', 'FontSize', fontSize)
 hold off
-set(gca,'fontsize',fontSize)
+set(ax1,'fontsize',fontSize)
 
 % SAVE FIG (RECT)
 % exportgraphics(gcf,fullfile(figsDir,samName(1:end-4)+"tnv_polar.png"), ...

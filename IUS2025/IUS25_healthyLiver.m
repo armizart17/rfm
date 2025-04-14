@@ -207,8 +207,13 @@ bmode_sam   = SAM.bMode;
 % pars.x_roi     = [rect(1), rect(1)+rect(3)];      % [º]
 % pars.z_roi     = [rect(2), rect(2)+rect(4)]*1E-3; % [m]
 
-pars.x_roi = [1.0492   30.8074];
-pars.z_roi = [0.0415    0.0877];
+
+pars.z_roi = [0.0415    0.0877]; % 0.0462
+pars.x_roi = [1.0492   30.8074]; % 29.75
+
+% NEW
+pars.x_roi = [3.0992   28.7574]; % 25.75
+pars.z_roi = [0.0435    0.0857]; % 0.0442
 %%
 
 % fprintf('ID N° %d : %s\n', iFile, samName);
@@ -435,10 +440,10 @@ RSp_r_ufr   = RSp_r(:,:,range);
 
 %
 % DENOISING TNV RSP
-mu          = 1.5;
+mu          = 1.3;
 tau         = 0.0100;
 maxIter     = 1000;
-stableIter  = 20;
+stableIter  = 50;
 % tol         = 0.5e-4; % tolerance error
 tol         = 1e-3; % tolerance error
 RSp_k_ufr_vec = reshape(RSp_k_ufr, [], size(RSp_k_ufr, 3));   
@@ -737,6 +742,7 @@ if ~exist(dirOut) mkdir(dirOut); end
 [X,Z] = meshgrid(xFull, zFull);
 % r0      = SAM.r0;
 r0 = 0.0501;
+fact_transp = 0.45;
 
 fontSize = 26;
 roi = X >= x_ACS(3) & X <= x_ACS(end) & Z >= z_ACS(1) & Z <= z_ACS(end);
@@ -753,10 +759,10 @@ figure('Units','pixels', 'Position', [100, 100, 1200, 600]);
 
 % [ax1,~] = imOverlayPolar(bmode_sam,a_rfm,[-62.5 0],range_acs,0.7, ...
 %     xPolar,zPolar,xPolarACS,zPolarACS);
-[ax1,~] = imOverlayPolar(bmode_sam,a_rfm,range_bmode,range_acs,0.7, ...
+[ax1,~] = imOverlayPolar(bmode_sam,a_rfm,range_bmode,range_acs,fact_transp, ...
     xPolar,zPolar,xPolarACS,zPolarACS);
 
-title(ax1, sprintf('RFM: %.3f ± %.3f, CV=%.2f%%', m_a, s_a, cv_a));
+title(ax1, sprintf('RFM: %.2f ± %.2f, CV=%.2f%%', m_a, s_a, cv_a));
 xlabel(ax1, 'Lateral [cm]');
 ylabel(ax1, 'Axial [cm]');
 set(ax1, 'FontSize', fontSize);
@@ -774,18 +780,18 @@ annotation('textbox', [0.28, 0.795, 0.05, 0.10], 'String', 'HL', ...
 hold off;
 set(ax1,'fontsize',fontSize)
 
-exportgraphics(gcf,fullfile(dirOut,samName(1:end-4)+"_pol.png"), ...
-    'Resolution','300')
+% exportgraphics(gcf,fullfile(dirOut,samName(1:end-4)+"_pol.png"), ...
+%     'Resolution','300')
 
 % Plot TNV-RFM
 figure('Units','pixels', 'Position', [100, 100, 1200, 600]);
 
 % [ax2, ~] = imOverlayPolar(bmode_sam, a_rfm2, [-62.5 0], range_acs, 0.7, ...
     % xPolar, zPolar, xPolarACS, zPolarACS);
-[ax2, ~] = imOverlayPolar(bmode_sam, a_rfm2, range_bmode, range_acs, 0.7, ...
+[ax2, ~] = imOverlayPolar(bmode_sam, a_rfm2, range_bmode, range_acs, fact_transp, ...
     xPolar, zPolar, xPolarACS, zPolarACS);
 
-title(ax2, sprintf('TNV-RFM: %.3f ± %.3f, CV=%.2f%%', m_a2, s_a2, cv_a2));
+title(ax2, sprintf('TNV-RFM: %.2f ± %.2f, CV=%.2f%%', m_a2, s_a2, cv_a2));
 xlabel(ax2, 'Lateral [cm]');
 % ylabel(ax2, 'Axial [cm]');
 set(ax2, 'FontSize', fontSize);
@@ -793,7 +799,7 @@ ylim([0 17])
 xlim([-11.3 11.3])
 hold on;
 % contour(xPolar*1e2, zPolar*1e2, roi, 1, 'w--');
-% hb2=colorbar; ylabel(hb2,'dB\cdotcm\cdotMHz^{-1}', 'FontSize', fontSize)
+hb2=colorbar; ylabel(hb2,'dB\cdotcm\cdotMHz^{-1}', 'FontSize', fontSize)
 % Add label box "FL"
 annotation('textbox', [0.28, 0.795, 0.05, 0.10], 'String', 'HL', ...
     'EdgeColor', 'w', 'BackgroundColor', 'k', 'Color', 'w','FontSize', fontSize+6, ...
@@ -801,8 +807,8 @@ annotation('textbox', [0.28, 0.795, 0.05, 0.10], 'String', 'HL', ...
 hold off;
 set(ax2,'fontsize',fontSize)
 
-exportgraphics(gcf,fullfile(dirOut,samName(1:end-4)+"_polTNV.png"), ...
-    'Resolution','300')
+% exportgraphics(gcf,fullfile(dirOut,samName(1:end-4)+"_polTNV.png"), ...
+%     'Resolution','300')
 end
 
 function t_delay = getRXDelays(Trans, t, n_elements, n_pulses, sound_speed, wvl)
