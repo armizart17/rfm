@@ -1,5 +1,5 @@
-% Reference Frequency Method v2 March
-% AMZ 
+% Reference Frequency Method vApril-May
+% Acq using plane wave imaging
 
 clear all, 
 close all;
