@@ -2,7 +2,7 @@
 % AMZ 
 
 clear all, 
-close all;
+% close all;
 
 Np2dB       = 20*log10(exp(1));
 dB2Np       = 1/Np2dB;
@@ -25,42 +25,30 @@ iPhantom = 3;
 [ret, pcname] = system('hostname');
 
 if strcmp(pcname(1:end-1), 'C084285') % PC LIM
-    baseDir = 'D:\emirandaz\qus\data';
+    baseDir = 'D:\emirandaz\qus\data\bf_PW_M05_D04_vok\L11-4v\40V\';
 else % PC EMZ
     baseDir = 'C:\Users\armiz\OneDrive\Documentos\MATLAB\dataLIM\';
 end
 %% DATA VERASONICS
-if dataVerasonics
-pathData = fullfile(baseDir, 'SavedDataQUSPhantom\bf'); 
+
+% baseDir = fullfile(baseDir, 'SavedDataQUSPhantom\bf'); 
 
 folderDataSam = '544'; numPhantomSam = '544'; alpha_sam = 0.53; sos_sam = 1539;
 % folderDataSam = '261'; numPhantomSam = '261'; alpha_sam = 0.54; sos_sam = 1509;
-samName = numPhantomSam + "_F" + list_Phantom(iPhantom);
+filesSam = dir(fullfile(baseDir, folderDataSam,'*.mat'));
+samName = filesSam(1).name;
 
 folderDataRef = '261'; numPhantomRef = '261'; alpha_ref = 0.48; sos_ref = 1509;
 % folderDataRef = '544'; numPhantomRef = '544'; alpha_ref = 0.53; sos_ref = 1539;
 
 % refName = numPhantomRef + "_F";
 
-filesRef = dir(fullfile(pathData, folderDataRef,'*.mat'));
-end
-%% DATA SONIX
-if dataSonix
-% folderDataSam = 'ID261V2'; numPhantomSam = 261; 
-folderDataSam = 'ID544V2'; numPhantomSam = 544; alpha_sam = 0.53; sos_sam = 1539;
+filesRef = dir(fullfile(baseDir, folderDataRef,'*.mat'));
 
-filesSam = dir(fullfile(pathData, folderDataSam,'*.mat'));
-% samList = ["16-19-52","16-20-50","16-21-22", "16-21-22"];
-samName = filesSam(1).name;
 
-folderDataRef = 'ID544V2'; numPhantomSam = 544; alpha_ref = 0.53; sos_ref = 1539;
-folderDataRef = 'ID261V2'; numPhantomSam = 261; alpha_ref = 0.48; sos_ref = 1509;
-
-filesRef = dir(fullfile(pathData, folderDataRef,'*.mat'));
-end
 %% LOAD DDATA
 
-SAM = load (fullfile(pathData, folderDataSam, samName));
+SAM = load (fullfile(baseDir, folderDataSam, samName));
 SAM.rf = SAM.rf(:,:,1);
 SAM.c0 = sos_sam;
 
@@ -71,10 +59,10 @@ bmode_sam = db(hilbert(SAM.rf));
 bmode_sam = bmode_sam - max(bmode_sam(:));
 
 numRefs  = length(filesRef); 
-REF      = load( fullfile(pathData, folderDataRef, filesRef(1).name ) );
+REF      = load( fullfile(baseDir, folderDataRef, filesRef(1).name ) );
 newrf  = nan([size(REF.rf), numRefs], 'like', REF.rf); % Use 'like' for type consistency
 for i = 1:numRefs
-    newrf(:,:,i) = load(fullfile(pathData,folderDataRef,filesRef(i).name ), 'rf').rf(:,:,1); % Directly extract rf, avoiding redundant variables
+    newrf(:,:,i) = load(fullfile(baseDir,folderDataRef,filesRef(i).name ), 'rf').rf(:,:,1); % Directly extract rf, avoiding redundant variables
 end
 
 REF.rf = newrf;
@@ -83,7 +71,8 @@ REF.c0  = sos_ref;
 
 %% SPECTRAL PARAMETERS
 
-pars.bw          = [3 8.4]; % [MHz]
+% pars.bw          = [3 8.4]; % [MHz]
+pars.bw          = [3.7 8.7]; % [MHz]
 pars.overlap     = 0.8;
 pars.blocksize   = 10; % wavelengths
 pars.z_roi       = [4 36]*1E-3; % [m] 
@@ -437,8 +426,8 @@ title(sprintf('RFM: %.2f ± %.2f, CV = %.2f%%', ...
 axis("image")
 % ylim([0.1 3.5])
 % yticks([0 1 2 3 4])
-ylim([2.25 5.2])
-yticks([ 3 4 5 ])
+% ylim([2.25 5.2])
+% yticks([ 3 4 5 ])
 set(gca,'fontsize',fontSize)
 
 % METRICS
@@ -563,8 +552,8 @@ title(sprintf('TNV-RFM: %.2f ± %.2f, CV = %.2f%%', ...
 axis("image")
 % ylim([0.1 3.5])
 % yticks([0 1 2 3 4])
-ylim([2.25 5.2])
-yticks([ 3 4 5 ])
+% ylim([2.25 5.2])
+% yticks([ 3 4 5 ])
 set(gca,'fontsize',fontSize)
 
 % METRICS
@@ -595,6 +584,8 @@ title('\bfLiver Phantom')
 set(gca,'fontsize',fontSize+2)
 grid on;
 
+%% 
+keyboard
 
 %% SAVE FIG
 [ret, pcname] = system('hostname');
