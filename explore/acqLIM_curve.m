@@ -14,6 +14,8 @@
 %% Beamformed and saved data (requires function loadAndBfCurve_C52v, check below)
 % By EMZ based on CS code
 
+%% BEAMFORMING
+
 inputDir = 'Q:\CAvendanoData\';
 outputDir0 = 'D:\emirandaz\qus\data\liver'; % change if needed
 

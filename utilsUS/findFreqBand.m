@@ -6,7 +6,7 @@ function [fLeft,fRight] = findFreqBand(f, y, ratio)
 % Inputs:
 %       - f         Frequencies vector 
 %       - y         Magnitude spectrum vector, must be the same size of f
-%       - ratio     Scalar (before do db2mag())
+%       - ratio     Scalar (before do db2pow())
 % Outputs:
 %       - fLeft     Low Frequency
 %       - fRight    High Frequency

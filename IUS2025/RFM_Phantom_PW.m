@@ -9,14 +9,28 @@ dB2Np       = 1/Np2dB;
 range_bmode = [-60 0];
 range_acs   = [0 1.2];
 manualroi   = false;
-fontSize = 26;
+% acqMode     = 'PW';
+acqMode     = 'PWC';
+
+% % 9 Ang
+% bw_low  = [3.1 3.3 3.5 3.7];
+% bw_high = [7.8 8.0 8.2 8.4];
+
+% 21 Ang
+% bw_low  = [3.7 3.9 4.0 4.1 4.3];
+% bw_high = [8.2 8.4 8.5 8.6 8.7];
+
+% for idx_low = 1:length(bw_low)
+    % for idx_high = 1:length(bw_high)
+
+fontSize    = 26;
 
 dataVerasonics = true;
 dataSonix      = false;
 
-mean2d = @(x) mean(x(:));
-std2d = @(x) std(x(:));
-cv2d = @(x) 100*std(x(:))/mean(x(:));
+mean2d  = @(x) mean(x(:));
+std2d   = @(x) std(x(:));
+cv2d    = @(x) 100*std(x(:))/mean(x(:));
 calc2dStats = {@(x) mean(x(:)), @(x) std(x(:)), @(x) 100 * std(x(:)) / mean(x(:))};
 
 list_Phantom = ["", "_2", "_3"];
@@ -24,11 +38,46 @@ iPhantom = 3;
 
 [ret, pcname] = system('hostname');
 
+if strcmp(acqMode, 'PWC')
+%%%%%%%%%%%%%%%%%%%%%%% PWC %%%%%%%%%%%%%%%%%%%%%%%
+% pars.bw         = [3.5 8.2]; % [MHz]
+% numAngles = 9;
+% numAngles = 21;
+% pars.bw          = [3.7 8]; % [MHz] % 544 9Ang
+% pars.bw          = [4.1 8.7]; % [MHz] % 544 21Ang
+
+% pars.bw(1) = bw_low(idx_low);
+% pars.bw(2) = bw_high(idx_high);
+
 if strcmp(pcname(1:end-1), 'C084285') % PC LIM
-    baseDir = 'D:\emirandaz\qus\data\bf_PW_M05_D04_vok\L11-4v\40V\';
+    baseDir = 'D:\emirandaz\qus\data\bf_PWC_M04_D25_vsos\L11-4v';
 else % PC EMZ
-    baseDir = 'C:\Users\armiz\OneDrive\Documentos\MATLAB\dataLIM\';
+    baseDir = '.';
 end
+baseDir = strcat(baseDir, '\', num2str(numAngles), 'Ang');
+%%%%%%%%%%%%%%%%%%%%%%% PWC %%%%%%%%%%%%%%%%%%%%%%%
+end
+
+if strcmp(acqMode, 'PW')
+%%%%%%%%%%%%%%%%%%%%%%% PW %%%%%%%%%%%%%%%%%%%%%%%
+volts = 20;
+% volts = 40;
+% pars.bw          = [3.7 8.7]; % [MHz] % 261 v1
+% pars.bw          = [3.7 8.8]; % [MHz] % 261 v1 better
+pars.bw          = [3.7 8.9]; % [MHz] % 544 v1
+
+% pars.bw          = [3.75, 8.84]; % [MHz] 261 automatic detection v2, findFreqBand
+% pars.bw          = [3.60, 8.98]; % [MHz] 544 automatic detection v2, findFreqBand
+
+if strcmp(pcname(1:end-1), 'C084285') % PC LIM
+    baseDir = 'D:\emirandaz\qus\data\bf_PW_M04_D05_vsos\L11-4v';
+else % PC EMZ
+    baseDir = '.';
+end
+baseDir = strcat(baseDir, '\', num2str(volts), 'V');
+%%%%%%%%%%%%%%%%%%%%%%% PW %%%%%%%%%%%%%%%%%%%%%%%
+end
+
 %% DATA VERASONICS
 
 % baseDir = fullfile(baseDir, 'SavedDataQUSPhantom\bf'); 
@@ -36,7 +85,9 @@ end
 folderDataSam = '544'; numPhantomSam = '544'; alpha_sam = 0.53; sos_sam = 1539;
 % folderDataSam = '261'; numPhantomSam = '261'; alpha_sam = 0.54; sos_sam = 1509;
 filesSam = dir(fullfile(baseDir, folderDataSam,'*.mat'));
-samName = filesSam(1).name;
+% samName = filesSam(1).name; 
+% samName = filesSam(2).name; % 544 PWC 9Ang
+samName = filesSam(1).name; % 544 PWC 21Ang
 
 folderDataRef = '261'; numPhantomRef = '261'; alpha_ref = 0.48; sos_ref = 1509;
 % folderDataRef = '544'; numPhantomRef = '544'; alpha_ref = 0.53; sos_ref = 1539;
@@ -46,37 +97,44 @@ folderDataRef = '261'; numPhantomRef = '261'; alpha_ref = 0.48; sos_ref = 1509;
 filesRef = dir(fullfile(baseDir, folderDataRef,'*.mat'));
 
 
-%% LOAD DDATA
+%% LOAD DATA
 
-SAM = load (fullfile(baseDir, folderDataSam, samName));
-SAM.rf = SAM.rf(:,:,1);
-SAM.c0 = sos_sam;
-
+SAM     = load (fullfile(baseDir, folderDataSam, samName));
+SAM.rf  = SAM.rf(:,:,1);
+SAM.c0  = sos_sam;
 gt_acs  = alpha_sam;
 
+% % % TBD
+% filesSam = dir(fullfile(baseDir, folderDataSam,'*.mat'));
+% numSams  = length(filesSam); 
+% SAM      = load( fullfile(pathData, folderDataSam, filesSam(1).name ) );
+% newrf    = nan([size(SAM.rf), numSams], 'like', SAM.rf); % Use 'like' for type consistency
+% for i = 1:numSams
+%     newrf(:,:,i) = load(fullfile(pathData,folderDataSam,filesSam(i).name ), 'rf').rf(:,:,1); % Directly extract rf, avoiding redundant variables
+% end
+% SAM.rf  = newrf;
+% SAM.acs = alpha_sam;
+% SAM.c0  = sos_sam;
+
 % B-MODE CHECK
-bmode_sam = db(hilbert(SAM.rf));
+bmode_sam = db(hilbert(SAM.rf(:,:,1)));
 bmode_sam = bmode_sam - max(bmode_sam(:));
 
-numRefs  = length(filesRef); 
-REF      = load( fullfile(baseDir, folderDataRef, filesRef(1).name ) );
-newrf  = nan([size(REF.rf), numRefs], 'like', REF.rf); % Use 'like' for type consistency
+numRefs   = length(filesRef); 
+REF       = load( fullfile(baseDir, folderDataRef, filesRef(1).name ) );
+newrf     = nan([size(REF.rf), numRefs], 'like', REF.rf); % Use 'like' for type consistency
 for i = 1:numRefs
     newrf(:,:,i) = load(fullfile(baseDir,folderDataRef,filesRef(i).name ), 'rf').rf(:,:,1); % Directly extract rf, avoiding redundant variables
 end
 
-REF.rf = newrf;
+REF.rf  = newrf;
 REF.acs = alpha_ref;
 REF.c0  = sos_ref;
 
 %% SPECTRAL PARAMETERS
 
-% pars.bw          = [3 8.4]; % [MHz]
-pars.bw          = [3.7 8.7]; % [MHz]
 pars.overlap     = 0.8;
 pars.blocksize   = 10; % wavelengths
-pars.z_roi       = [4 36]*1E-3; % [m] 
-pars.x_roi       = [-15 15]*1E-3; % [m] 
 pars.saran_layer = false;
 pars.ratio_zx    = 1.25;
 pars.window_type = 3; %  (1) Hanning, (2) Tuckey, (3) Hamming, (4) Tchebychev
@@ -87,8 +145,8 @@ blocksize_wv_r = 20;
 if ~manualroi
 
     % pars.z_roi       = [5 35]*1E-3; % [m] 
-    pars.z_roi       = [25 50]*1E-3; % [m] 
-    pars.x_roi       = [-17 17]*1E-3; % [m] 
+    pars.z_roi       = [10 50]*1E-3; % [m] 
+    pars.x_roi       = [-15 15]*1E-3; % [m] 
         
 else 
 
@@ -145,13 +203,17 @@ if isfield(SAM, 'RF')
     rfdata_sam   = SAM.RF;
 end
 
-figure,
-imagesc(SAM.x*1E3, SAM.z*1E3, bmode_sam), axis("image");
-rectangle('Position', 1E3*[pars.x_roi(1) pars.z_roi(1) pars.x_roi(2)-pars.x_roi(1) pars.z_roi(2)-pars.z_roi(1)], ...
-        'EdgeColor','r', 'LineWidth', 2, 'LineStyle','--'), hold off;
-xlabel('Lateral [mm]'), ylabel('Depth [mm]');
-title('SAM')
-colormap('gray')
+caption = strcat('Acq: ', strrep(samName(1:end-4), '_', '-'));
+
+% figure,
+% imagesc(SAM.x*1E3, SAM.z*1E3, bmode_sam, range_bmode), axis("image");
+% rectangle('Position', 1E3*[pars.x_roi(1) pars.z_roi(1) pars.x_roi(2)-pars.x_roi(1) pars.z_roi(2)-pars.z_roi(1)], ...
+%         'EdgeColor','r', 'LineWidth', 2, 'LineStyle','--'), hold off;
+% xlabel('Lateral [mm]'), ylabel('Depth [mm]');
+% hb2=colorbar; ylabel(hb2,'dB')
+% % title('SAM')
+% title(caption);
+% colormap('gray')
 
 dx = x(2)-x(1);
 dz = z(2)-z(1);
@@ -316,7 +378,8 @@ RSp_r = log(RSp_r); % @@
 %%%%%%%%%%%%%%%%%%%% FAST WAY %%%%%%%%%%%%%%%%%%%%
 
 % UFR strategy
-bw_ufr = [3 9];
+% bw_ufr = [3 9]; % FOCUS
+bw_ufr = pars.bw;
 freqL = bw_ufr(1); freqH = bw_ufr(2);
 range = bandFull >= freqL & bandFull <= freqH;
 
@@ -415,14 +478,17 @@ xFull           = SAM.x*units;
 zFull           = SAM.z*units;
 
 figure, 
-set(gcf, 'Units', 'pixels', 'Position', [100, 100, 1000, 600]); % [x, y, width, height]
+set(gcf, 'Units', 'pixels', 'Position', [100, 100, 1000, 800]); % [x, y, width, height]
+
 [~,hB,hColor] = imOverlaySimple(bmodeFull, colorImg, range_bmode, ...
                 range_img, transparency, x_img, z_img, xFull, zFull);
 
 xlabel('Lateral [cm]'), ylabel('Depth [cm]');
 hColor.Label.String = 'dB\cdotcm^{-1}\cdotMHz^{-1}';
-title(sprintf('RFM: %.2f ± %.2f, CV = %.2f%%', ...
-               m_a, s_a, cv_a));
+% title(sprintf('RFM: %.2f ± %.2f, CV = %.2f%%', ...
+%                m_a, s_a, cv_a));
+title(sprintf('BW(%.1f–%.1f MHz) RFM: %.2f ± %.2f, CV = %.2f%%', ...
+    pars.bw(1), pars.bw(2), m_a, s_a, cv_a));
 axis("image")
 % ylim([0.1 3.5])
 % yticks([0 1 2 3 4])
@@ -433,6 +499,10 @@ set(gca,'fontsize',fontSize)
 % METRICS
 m_RFM = get_metrics_homo_gt(a_rfm, true(size(a_rfm)), alpha_sam, 'RFM');
 
+    % end
+% end
+
+% keyboard
 %% TNV-RFM
 
 % DENOISING TNV RSP
@@ -554,6 +624,7 @@ axis("image")
 % yticks([0 1 2 3 4])
 % ylim([2.25 5.2])
 % yticks([ 3 4 5 ])
+ylim([0 6.2]);
 set(gca,'fontsize',fontSize)
 
 % METRICS
