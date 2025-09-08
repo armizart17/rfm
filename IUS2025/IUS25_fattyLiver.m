@@ -56,7 +56,7 @@ bmode_sam   = SAM.bMode;
 SAM.x       = SAM.xr;
 SAM.z       = SAM.zr;
 
-caption = strrep(samName(1:end-4), '_', ' ');
+caption = strrep(samName(1:end-4), '_', '-');
 
 % figure,
 % imagesc(SAM.x, SAM.z*1E3, bmode_sam, range_bmode), 

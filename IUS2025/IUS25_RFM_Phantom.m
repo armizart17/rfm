@@ -595,6 +595,8 @@ title('\bfLiver Phantom')
 set(gca,'fontsize',fontSize+2)
 grid on;
 
+%%
+keyboard
 
 %% SAVE FIG
 [ret, pcname] = system('hostname');

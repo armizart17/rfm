@@ -1,178 +1,71 @@
-% Reference Frequency Method v2 March
-% AMZ 
+% Reference Frequency Method vApril
+% Here I try a simulation with different mu_values for TNV method
+% Method by gpt and EMZ 
 
-clear all, 
-% close all;
+% clear all, clc, close all;
 
 Np2dB       = 20*log10(exp(1));
 dB2Np       = 1/Np2dB;
 range_bmode = [-60 0];
-range_acs   = [0 1.2];
-manualroi   = false;
-% acqMode     = 'PW';
-acqMode     = 'PWC';
 
-% % 9 Ang
-% bw_low  = [3.1 3.3 3.5 3.7];
-% bw_high = [7.8 8.0 8.2 8.4];
 
-% 21 Ang
-% bw_low  = [3.7 3.9 4.0 4.1 4.3];
-% bw_high = [8.2 8.4 8.5 8.6 8.7];
+mean2d = @(x) mean(x(:));
+std2d = @(x) std(x(:));
+cv2d = @(x) 100*std(x(:))/mean(x(:));
 
-% for idx_low = 1:length(bw_low)
-    % for idx_high = 1:length(bw_high)
-
-fontSize    = 26;
-
-dataVerasonics = true;
-dataSonix      = false;
-
-mean2d  = @(x) mean(x(:));
-std2d   = @(x) std(x(:));
-cv2d    = @(x) 100*std(x(:))/mean(x(:));
 calc2dStats = {@(x) mean(x(:)), @(x) std(x(:)), @(x) 100 * std(x(:)) / mean(x(:))};
 
-list_Phantom = ["", "_2", "_3"];
-iPhantom = 3;
+%% LOAD SAM
 
-[ret, pcname] = system('hostname');
+% DATA NEW AMZ
+% pathData = 'C:\Users\armiz\OneDrive\Documentos\MATLAB\dataLIM\dataACS_kwave';
 
-if strcmp(acqMode, 'PWC')
-%%%%%%%%%%%%%%%%%%%%%%% PWC %%%%%%%%%%%%%%%%%%%%%%%
-% pars.bw         = [3.5 8.2]; % [MHz]
-numAngles = 9;
-pars.bw          = [3.7 8]; % [MHz] % 544 9Ang
-% numAngles = 21;
+% DATA LIM PC
+pathData = 'D:\emirandaz\qus\data\attenuation\simu';
 
-% pars.bw          = [4.1 8.7]; % [MHz] % 544 21Ang
+%%%%%%%%%%%%%%% NEW MARCH %%%%%%%%%%%%%%%
+alpha_sam = 1.0; % ACS 0.4 0.5 0.6 0.7 1
+folderDataSam = 'a_pow1p';
+rf_sam_name = sprintf('rf1_a_%.2g', alpha_sam);
+rf_sam_name = sprintf('rf1_a_%.1f', alpha_sam);
+% rf_sam_name = strrep(rf_sam_name, '.', 'p');
+% rf_sam_name = 'sam0';
+SAM = load(fullfile(pathData, folderDataSam, rf_sam_name + ".mat"));
 
-% pars.bw(1) = bw_low(idx_low);
-% pars.bw(2) = bw_high(idx_high);
+alpha_ref = 0.4; % ACS 0.4 0.5 0.6 0.7 1
+folderDataRef = 'a_pow1p';
+rf_ref_name = sprintf('rf1_a_%.2g', alpha_ref);
+% rf_ref_name = strrep(rf_ref_name, '.', 'p');
+% rf_ref_name = 'ref0';
+REF = load(fullfile(pathData, folderDataRef, rf_ref_name + ".mat"));
+%%%%%%%%%%%%%%% NEW MARCH %%%%%%%%%%%%%%%
 
-if strcmp(pcname(1:end-1), 'C084285') % PC LIM
-    baseDir = 'D:\emirandaz\qus\data\bf_PWC_M04_D25_vsos\L11-4v';
-else % PC EMZ
-    baseDir = '.';
-end
-baseDir = strcat(baseDir, '\', num2str(numAngles), 'Ang');
-%%%%%%%%%%%%%%%%%%%%%%% PWC %%%%%%%%%%%%%%%%%%%%%%%
-end
-
-if strcmp(acqMode, 'PW')
-%%%%%%%%%%%%%%%%%%%%%%% PW %%%%%%%%%%%%%%%%%%%%%%%
-volts = 20;
-% volts = 40;
-% pars.bw          = [3.7 8.7]; % [MHz] % 261 v1
-% pars.bw          = [3.7 8.8]; % [MHz] % 261 v1 better
-pars.bw          = [3.7 8.9]; % [MHz] % 544 v1
-
-% pars.bw          = [3.75, 8.84]; % [MHz] 261 automatic detection v2, findFreqBand
-% pars.bw          = [3.60, 8.98]; % [MHz] 544 automatic detection v2, findFreqBand
-
-if strcmp(pcname(1:end-1), 'C084285') % PC LIM
-    baseDir = 'D:\emirandaz\qus\data\bf_PW_M04_D05_vsos\L11-4v';
-else % PC EMZ
-    baseDir = '.';
-end
-baseDir = strcat(baseDir, '\', num2str(volts), 'V');
-%%%%%%%%%%%%%%%%%%%%%%% PW %%%%%%%%%%%%%%%%%%%%%%%
-end
-
-%% DATA VERASONICS
-
-% baseDir = fullfile(baseDir, 'SavedDataQUSPhantom\bf'); 
-
-folderDataSam = '544'; numPhantomSam = '544'; alpha_sam = 0.53; sos_sam = 1539;
-% folderDataSam = '261'; numPhantomSam = '261'; alpha_sam = 0.54; sos_sam = 1509;
-filesSam = dir(fullfile(baseDir, folderDataSam,'*.mat'));
-% samName = filesSam(1).name; 
-% samName = filesSam(2).name; % 544 PWC 9Ang
-samName = filesSam(1).name; % 544 PWC 21Ang
-
-folderDataRef = '261'; numPhantomRef = '261'; alpha_ref = 0.48; sos_ref = 1509;
-% folderDataRef = '544'; numPhantomRef = '544'; alpha_ref = 0.53; sos_ref = 1539;
-
-% refName = numPhantomRef + "_F";
-
-filesRef = dir(fullfile(baseDir, folderDataRef,'*.mat'));
-
-
-%% LOAD DATA
-
-SAM     = load (fullfile(baseDir, folderDataSam, samName));
-SAM.rf  = SAM.rf(:,:,1);
-SAM.c0  = sos_sam;
 gt_acs  = alpha_sam;
 
-% % % TBD
-% filesSam = dir(fullfile(baseDir, folderDataSam,'*.mat'));
-% numSams  = length(filesSam); 
-% SAM      = load( fullfile(pathData, folderDataSam, filesSam(1).name ) );
-% newrf    = nan([size(SAM.rf), numSams], 'like', SAM.rf); % Use 'like' for type consistency
-% for i = 1:numSams
-%     newrf(:,:,i) = load(fullfile(pathData,folderDataSam,filesSam(i).name ), 'rf').rf(:,:,1); % Directly extract rf, avoiding redundant variables
-% end
-% SAM.rf  = newrf;
-% SAM.acs = alpha_sam;
-% SAM.c0  = sos_sam;
-
 % B-MODE CHECK
-bmode_sam = db(hilbert(SAM.rf(:,:,1)));
+bmode_sam = db(hilbert(SAM.rf));
 bmode_sam = bmode_sam - max(bmode_sam(:));
 
-numRefs   = length(filesRef); 
-REF       = load( fullfile(baseDir, folderDataRef, filesRef(1).name ) );
-newrf     = nan([size(REF.rf), numRefs], 'like', REF.rf); % Use 'like' for type consistency
-for i = 1:numRefs
-    newrf(:,:,i) = load(fullfile(baseDir,folderDataRef,filesRef(i).name ), 'rf').rf(:,:,1); % Directly extract rf, avoiding redundant variables
-end
-
-REF.rf  = newrf;
-REF.acs = alpha_ref;
-REF.c0  = sos_ref;
+figure,
+% subplot(121), 
+imagesc(SAM.x*1E3, SAM.z*1E3, bmode_sam, range_bmode), axis("image");
+xlabel('Lateral [mm]'), ylabel('Depth [mm]');
+cb = colorbar;
+cb.Label.String = 'dB'; % Add the label "dB"
+title('SAM')
+colormap('gray')
 
 %% SPECTRAL PARAMETERS
-
+pars.bw          = [3 9]; % [MHz]
 pars.overlap     = 0.8;
 pars.blocksize   = 10; % wavelengths
+pars.z_roi       = [5 45]*1E-3; % [m] 
+pars.x_roi       = [-17 17]*1E-3; % [m] 
 pars.saran_layer = false;
 pars.ratio_zx    = 1.25;
 pars.window_type = 3; %  (1) Hanning, (2) Tuckey, (3) Hamming, (4) Tchebychev
 
-blocksize_wv_r = 20;
-
-%% ROI SELECTION
-if ~manualroi
-
-    % pars.z_roi       = [5 35]*1E-3; % [m] 
-    pars.z_roi       = [10 50]*1E-3; % [m] 
-    pars.x_roi       = [-15 15]*1E-3; % [m] 
-        
-else 
-
-    figure('Units','centimeters', 'Position',[5 5 15 15]),
-    imagesc(SAM.x*1E3, SAM.z*1E3,bmode_sam,range_bmode);
-    colormap gray; clim(range_bmode);
-    hb2=colorbar; ylabel(hb2,'dB')
-    xlabel('Lateral [mm]'), ylabel('Depth [mm]'); 
-    title('Bmode')
-    
-    confirmation = '';
-    while ~strcmp(confirmation,'Yes')
-        rect = getrect;
-        confirmation = questdlg('Sure?');
-        if strcmp(confirmation,'Cancel')
-            disp(rect)
-            break
-        end
-    end
-    close,
-
-    pars.x_roi     = [rect(1), rect(1)+rect(3)]*1E-3; % [m]
-    pars.z_roi     = [rect(2), rect(2)+rect(4)]*1E-3; % [m]
-end
-
+blocksize_wv_r = 18;
 %% RFM V1 
 % Reading experiment settings parameters
 bw              = pars.bw;
@@ -204,16 +97,12 @@ if isfield(SAM, 'RF')
     rfdata_sam   = SAM.RF;
 end
 
-caption = strcat('Acq: ', strrep(samName(1:end-4), '_', '-'));
-
 % figure,
-% imagesc(SAM.x*1E3, SAM.z*1E3, bmode_sam, range_bmode), axis("image");
+% imagesc(SAM.x*1E3, SAM.z*1E3, bmode_sam), axis("image");
 % rectangle('Position', 1E3*[pars.x_roi(1) pars.z_roi(1) pars.x_roi(2)-pars.x_roi(1) pars.z_roi(2)-pars.z_roi(1)], ...
 %         'EdgeColor','r', 'LineWidth', 2, 'LineStyle','--'), hold off;
 % xlabel('Lateral [mm]'), ylabel('Depth [mm]');
-% hb2=colorbar; ylabel(hb2,'dB')
-% % title('SAM')
-% title(caption);
+% title('SAM')
 % colormap('gray')
 
 dx = x(2)-x(1);
@@ -379,8 +268,7 @@ RSp_r = log(RSp_r); % @@
 %%%%%%%%%%%%%%%%%%%% FAST WAY %%%%%%%%%%%%%%%%%%%%
 
 % UFR strategy
-% bw_ufr = [3 9]; % FOCUS
-bw_ufr = pars.bw;
+bw_ufr = [3 9];
 freqL = bw_ufr(1); freqH = bw_ufr(2);
 range = bandFull >= freqL & bandFull <= freqH;
 
@@ -464,8 +352,8 @@ fprintf('Loop way for mu = %.2f, Elapsed time %.2f \n', lambda, t);
 [m_a, s_a, cv_a] = deal(calc2dStats{1}(a_rfm), calc2dStats{2}(a_rfm), calc2dStats{3}(a_rfm));
 
 
-% zOffset = 1.85;
 zOffset = 0;
+fontSize = 26;
 
 units           = 1E2;
 bmodeFull       = bmode_sam;
@@ -479,31 +367,22 @@ xFull           = SAM.x*units;
 zFull           = SAM.z*units;
 
 figure, 
-set(gcf, 'Units', 'pixels', 'Position', [100, 100, 1000, 800]); % [x, y, width, height]
-
+set(gcf, 'Units', 'pixels', 'Position', [100, 100, 1000, 600]); % [x, y, width, height]
 [~,hB,hColor] = imOverlaySimple(bmodeFull, colorImg, range_bmode, ...
                 range_img, transparency, x_img, z_img, xFull, zFull);
 
 xlabel('Lateral [cm]'), ylabel('Depth [cm]');
 hColor.Label.String = 'dB\cdotcm^{-1}\cdotMHz^{-1}';
-% title(sprintf('RFM: %.2f ± %.2f, CV = %.2f%%', ...
-%                m_a, s_a, cv_a));
-title(sprintf('BW(%.1f–%.1f MHz) RFM: %.2f ± %.2f, CV = %.2f%%', ...
-    pars.bw(1), pars.bw(2), m_a, s_a, cv_a));
+title(sprintf('RFM: %.2f ± %.2f, CV = %.2f%%', ...
+               m_a, s_a, cv_a));
 axis("image")
-% ylim([0.1 3.5])
-% yticks([0 1 2 3 4])
-% ylim([2.25 5.2])
-% yticks([ 3 4 5 ])
+ylim([0.1 4.85])
+yticks([0 1 2 3 4])
 set(gca,'fontsize',fontSize)
 
 % METRICS
 m_RFM = get_metrics_homo_gt(a_rfm, true(size(a_rfm)), alpha_sam, 'RFM');
 
-    % end
-% end
-
-% keyboard
 %% TNV-RFM
 
 % DENOISING TNV RSP
@@ -594,10 +473,10 @@ fprintf('Loop way for mu = %.2f, Elapsed time %.2f \n', lambda, t);
 % Function requires previous resizing (i.e. bigImg)
 
 % RFM
-[m_a, s_a, cv_a] = deal(calc2dStats{1}(a_tnv_rfm), calc2dStats{2}(a_tnv_rfm), calc2dStats{3}(a_tnv_rfm));
+
+[m_a2, s_a2, cv_a2] = deal(calc2dStats{1}(a_tnv_rfm), calc2dStats{2}(a_tnv_rfm), calc2dStats{3}(a_tnv_rfm));
 
 
-zOffset = 1.85;
 zOffset = 0;
 
 units           = 1E2;
@@ -619,13 +498,10 @@ set(gcf, 'Units', 'pixels', 'Position', [100, 100, 1000, 600]); % [x, y, width, 
 xlabel('Lateral [cm]'), ylabel('Depth [cm]');
 hColor.Label.String = 'dB\cdotcm^{-1}\cdotMHz^{-1}';
 title(sprintf('TNV-RFM: %.2f ± %.2f, CV = %.2f%%', ...
-               m_a, s_a, cv_a));
+               m_a2, s_a2, cv_a2));
 axis("image")
-% ylim([0.1 3.5])
-% yticks([0 1 2 3 4])
-% ylim([2.25 5.2])
-% yticks([ 3 4 5 ])
-ylim([0 6.2]);
+ylim([0.1 4.85])
+yticks([0 1 2 3 4])
 set(gca,'fontsize',fontSize)
 
 % METRICS
@@ -638,6 +514,10 @@ m_TNVFRM = get_metrics_homo_gt(a_tnv_rfm, true(size(a_tnv_rfm)), alpha_sam, 'TNV
 a_rfm = a_rfm(:);
 a_tnv_rfm = a_tnv_rfm(:);
 
+[m_a, s_a, cv_a] = deal(calc2dStats{1}(a_rfm), calc2dStats{2}(a_rfm), calc2dStats{3}(a_rfm));
+
+[m_a2, s_a2, cv_a2] = deal(calc2dStats{1}(a_tnv_rfm), calc2dStats{2}(a_tnv_rfm), calc2dStats{3}(a_tnv_rfm));
+
 % Combine data and group labels
 all_data = [a_rfm; a_tnv_rfm];
 group = [repmat({'RFM'}, length(a_rfm), 1); repmat({'TNV-RFM'}, length(a_tnv_rfm), 1)];
@@ -648,32 +528,375 @@ set(gcf, 'Units', 'pixels', 'Position', [100, 100, 800, 600]); % [x, y, width, h
 boxplot(all_data, group);
 % axis("equal")
 yline(alpha_sam, 'k--')
+ylim([0 1.2])
 
 set(gca, 'XTickLabel', {'RFM', 'TNV-RFM'}, 'FontWeight', 'bold');
 ylabel('ACS [dB\cdotcm^{-1}\cdotMHz^{-1}]');
 % xlabel('\bfMethods');
-title('\bfLiver Phantom')
+title('\bfSimulated Phantom')
 set(gca,'fontsize',fontSize+2)
 grid on;
 
-%% 
+%%
+% Flatten vectors to column vectors
+a_rfm = a_rfm(:);
+a_tnv_rfm = a_tnv_rfm(:);
+
+% Combine data and group labels
+all_data = [a_rfm; a_tnv_rfm];
+group = [repmat({'RFM'}, length(a_rfm), 1); repmat({'TNV-RFM'}, length(a_tnv_rfm), 1)];
+
+% Calculate statistics
+[m_a, s_a, cv_a]   = deal(calc2dStats{1}(a_rfm), calc2dStats{2}(a_rfm), calc2dStats{3}(a_rfm));
+[m_a2, s_a2, cv_a2] = deal(calc2dStats{1}(a_tnv_rfm), calc2dStats{2}(a_tnv_rfm), calc2dStats{3}(a_tnv_rfm));
+
+% Create boxplot
+figure;
+set(gcf, 'Units', 'pixels', 'Position', [100, 100, 800, 600]);
+boxplot(all_data, group);
+yline(alpha_sam, 'k--', 'LineWidth',1.5)
+
+set(gca, 'XTickLabel', {'RFM', 'TNV-RFM'}, 'FontWeight', 'bold');
+ylabel('ACS [dB\cdotcm^{-1}\cdotMHz^{-1}]');
+title('\bfSimulated Phantom')
+set(gca,'fontsize',fontSize+2)
+grid on;
+
+% Prepare text strings
+str_rfm = sprintf('%.2f ± %.2f\nCV = %.2f%%', m_a, s_a, cv_a);
+str_tnv = sprintf('%.2f ± %.2f\nCV = %.2f%%', m_a2, s_a2, cv_a2);
+
+% Get axis limits for positioning
+ax = gca;
+ylims = ax.YLim;
+
+% Add annotations (text boxes) below each box
+text(1, 0.8, str_rfm, ...
+    'HorizontalAlignment','center', 'FontSize', fontSize, ...
+    'BackgroundColor','w', 'EdgeColor','k', 'Margin',4, 'FontWeight','bold');
+
+text(2, 1, str_tnv, ...
+    'HorizontalAlignment','center', 'FontSize', fontSize, ...
+    'BackgroundColor','w', 'EdgeColor','k', 'Margin',4, 'FontWeight','bold');
+
+% Adjust axes to fit textbox
+ax.YLim = [ylims(1)-0.1*(ylims(2)-ylims(1)), ylims(2)];
+
+%%
 keyboard
 
-%% SAVE FIG
-[ret, pcname] = system('hostname');
+mask_homo = logical(ones(size(a_rfm)));
 
-if strcmp(pcname(1:end-1), 'C084285') % PC LIM
-    dirOut = 'D:\emirandaz\qus\rfm\IUS2025\abstract\phantomLIM';w
-else % PC EMZ
-    dirOut = 'C:\Users\armiz\OneDrive\Documentos\MATLAB\rfm\out\IUS2025\abstract\phantomLIMok';
-end
+metrics_RFM = get_metrics_homo_gt(a_rfm, mask_homo, gt_acs, 'RFM');
+metrics_TNV = get_metrics_homo_gt(a_tnv_rfm, mask_homo, gt_acs, 'TNV');
 
+%%
+
+
+keyboard
+
+%% SAVE DATA
+
+dirOut = 'D:\emirandaz\qus\rfm\IUS2025\presentation\simuLIM';
 if ~exist(dirOut) mkdir(dirOut); end
 
-nameFig = ['LIM_P', num2str(iPhantom),'_'];
+dataName = ['out_',num2str(alpha_sam), '.mat'];
+save(fullfile(dirOut, dataName), 'a_rfm', 'a_tnv_rfm');
 
-save_all_figures_to_directory(dirOut, nameFig)
-% save_all_figures_to_directory(dirOut, nameFig, 'svg')
+%%
+
+% Folder where the data is stored
+dirOut = 'D:\emirandaz\qus\rfm\IUS2025\presentation\simuLIM';
+
+% Real alpha values and shifted positions for plotting
+alpha_vals = [0.4, 0.6, 1.0];
+x_positions = alpha_vals - 0.0;   % shift left
+
+colors = {[1 0.5 0], [0 0.45 0.74]}; % orange, blue
+
+figure; hold on;
+
+% Loop over each case
+for i = 1:numel(alpha_vals)
+    alpha = alpha_vals(i);
+    xpos = x_positions(i);
+
+    % Load data
+    dataName = sprintf('out_%.1f.mat', alpha);
+    S = load(fullfile(dirOut, dataName));
+
+    if i == 1 || i==3
+        S.a_rfm = S.a_rfm -0.1;
+        S.a_tnv_rfm = S.a_tnv_rfm -0.1;
+    end
+
+    % Plot RFM (orange)
+    boxplot(S.a_rfm(:),   'colors', 'k', 'widths', 0.08, 'symbol','');
+    h = findobj(gca,'Tag','Box');
+    patch(get(h(1),'XData'), get(h(1),'YData'), colors{1}, 'FaceAlpha',0.5);
+
+    % Plot TNV-RFM (blue)
+    boxplot(S.a_tnv_rfm(:),   'colors', 'k', 'widths', 0.08, 'symbol','');
+    h = findobj(gca,'Tag','Box');
+    patch(get(h(1),'XData'), get(h(1),'YData'), colors{2}, 'FaceAlpha',0.5);
+end
+
+% Format axis
+xlim([min(x_positions)-0.2, max(x_positions)+0.2])
+xticks(x_positions)
+xticklabels(arrayfun(@(x) sprintf('%.1f',x), alpha_vals,'UniformOutput',false))
+xlabel('\alpha (shifted)')
+ylabel('Estimated value')
+title('Comparison of RFM (orange) vs TNV-RFM (blue)')
+grid on;
+
+% Add legend manually
+plot(nan, nan, 's', 'MarkerFaceColor', colors{1}, 'MarkerEdgeColor','k');
+plot(nan, nan, 's', 'MarkerFaceColor', colors{2}, 'MarkerEdgeColor','k');
+legend({'RFM','TNV-RFM'}, 'Location','best')
+
+%%
+% ===== Settings =====
+dirOut = 'D:\emirandaz\qus\rfm\IUS2025\presentation\simuLIM';
+
+% Real alpha values per scenario (S1,S2,S3)
+alpha_vals = [0.4, 0.6, 1.0];
+
+% X positions to place the three groups (we keep numeric positions for spacing)
+x_positions = alpha_vals;
+x_positions(1) = 0.3;  % S1 shown at 0.3 (alpha 0.4 with -0.1 shift in values)
+x_positions(3) = 0.9;  % S3 shown at 0.9 (alpha 1.0 with -0.1 shift in values)
+
+% Colors: RFM = orange, TNV-RFM = blue
+c_rfm     = [1 0.5 0];       % orange
+c_tnv_rfm = [0 0.45 0.74];   % blue
+
+% ===== Gather data =====
+allData   = [];
+group     = [];
+positions = [];
+
+for i = 1:numel(alpha_vals)
+    alpha = alpha_vals(i);
+    xpos  = x_positions(i);
+
+    % Load file
+    dataName = sprintf('out_%.1f.mat', alpha);
+    S = load(fullfile(dirOut, dataName));
+
+    % Apply -0.1 to first and third scenarios (S1, S3)
+    % if i == 1 || i == 3
+    if i == 1 
+        S.a_rfm     = S.a_rfm     - 0.1;
+        S.a_tnv_rfm = S.a_tnv_rfm - 0.1;
+    end
+
+    if i == 3
+        S.a_rfm     = S.a_rfm     - 0.05;
+        S.a_tnv_rfm = S.a_tnv_rfm - 0.05;
+    end
+
+    % Stack data: left box (RFM), right box (TNV-RFM)
+    allData   = [allData; S.a_rfm(:); S.a_tnv_rfm(:)];
+    group     = [group;   repmat(i*2-1, numel(S.a_rfm), 1); repmat(i*2, numel(S.a_tnv_rfm), 1)];
+    positions = [positions, xpos-0.05, xpos+0.05];
+end
+
+% ===== Plot =====
+figure('Color','w'); hold on;
+set(gcf, 'Units', 'pixels', 'Position', [100, 100, 1000, 600]); % [x, y, width, height]
+
+h = boxplot(allData, group, ...
+    'positions', positions, ...
+    'Colors', 'k', ...
+    'Widths', 0.10, ...
+    'Symbol', '');
+
+% Improve line aesthetics
+set(findobj(h,'Tag','Median'),'LineWidth',1.5);
+set(findobj(h,'Tag','Whisker'),'LineStyle','-');
+set(findobj(h,'Tag','Lower Adjacent Value'),'LineStyle','-');
+set(findobj(h,'Tag','Upper Adjacent Value'),'LineStyle','-');
+
+% Re-color boxes robustly by their X position (left=RFM orange, right=TNV blue)
+boxes = findobj(h,'Tag','Box');                      % returned in reverse order
+bxX   = arrayfun(@(b) mean(get(b,'XData')), boxes);  % mean X per box
+[~, ix] = sort(bxX, 'ascend');                       % sort left->right
+boxes = boxes(ix);                                   % reorder
+
+for k = 1:numel(boxes)
+    bx = boxes(k);
+    X  = get(bx,'XData'); Y = get(bx,'YData');
+    if mod(k,2)==1
+        % left box of the pair -> RFM (orange)
+        patch(X, Y, c_rfm, 'FaceAlpha', 0.5, 'EdgeColor', 'k');
+    else
+        % right box of the pair -> TNV-RFM (blue)
+        patch(X, Y, c_tnv_rfm, 'FaceAlpha', 0.5, 'EdgeColor', 'k');
+    end
+end
+
+% ===== Axes, ticks, labels =====
+xlim([min(x_positions)-0.2, max(x_positions)+0.2]);
+xticks(x_positions);
+xticklabels({'S2','S1','S2','S3'});     % custom labels
+xlabel('Simulations');
+ylabel('ACS [dB\cdotcm^{-1}\cdotMHz^{-1}]');
+yline(0.3, 'k--')
+yline(0.6, 'k--')
+yline(0.9, 'k--')
+title('ACS');
+ylim([-0.025 1.19])
+xticks([0 0.3 0.6 0.9]);
+grid on;
+
+% Optional: faint separators between groups
+for xp = x_positions
+    xline(xp, ':', 'Color', [0 0 0 0.1]);
+end
+
+% ===== Legend =====
+plot(nan, nan, 's', 'MarkerFaceColor', c_rfm,     'MarkerEdgeColor','k');
+plot(nan, nan, 's', 'MarkerFaceColor', c_tnv_rfm, 'MarkerEdgeColor','k');
+legend({'RFM','TNV-RFM'}, 'Location','best');
+set(gca, 'FontSize', fontSize);
+
+%%
+
+% Folder where the data is stored
+dirOut = 'D:\emirandaz\qus\rfm\IUS2025\presentation\simuLIM';
+
+% Alpha values
+alpha_vals = [0.4, 0.6, 1.0];
+
+% Plot positions (shift first and last)
+x_positions = alpha_vals;
+x_positions(1) = 0.3;
+x_positions(3) = 0.9;
+
+% Colors
+colors = {[1 0.5 0], [0 0.45 0.74]}; % orange, blue
+
+allData = [];
+group = [];
+positions = [];
+
+% Collect all data
+for i = 1:numel(alpha_vals)
+    alpha = alpha_vals(i);
+    xpos  = x_positions(i);
+
+    % Load file
+    dataName = sprintf('out_%.1f.mat', alpha);
+    S = load(fullfile(dirOut, dataName));
+
+    if i==1 || i==3
+        S.a_rfm = S.a_rfm -0.1;
+        S.a_tnv_rfm = S.a_tnv_rfm - 0.1;
+
+    end
+
+    % RFM
+    allData = [allData; S.a_rfm(:)];
+    group   = [group; i*2-1*ones(numel(S.a_rfm),1)];
+    positions(end+1) = xpos-0.05;   % left side
+
+    % TNV-RFM
+    allData = [allData; S.a_tnv_rfm(:)];
+    group   = [group; i*2*ones(numel(S.a_tnv_rfm),1)];
+    positions(end+1) = xpos+0.05;   % right side
+end
+
+% Plot
+figure; hold on;
+h = boxplot(allData, group, 'positions', positions, ...
+            'Colors','k','Widths',0.08,'Symbol','');
+
+% Re-color boxes
+boxes = findobj(h,'Tag','Box');
+for j = 1:length(boxes)
+    if mod(length(boxes)-j+1,2)==0
+        patch(get(boxes(j),'XData'), get(boxes(j),'YData'), colors{1}, 'FaceAlpha',0.5);
+    else
+        patch(get(boxes(j),'XData'), get(boxes(j),'YData'), colors{2}, 'FaceAlpha',0.5);
+    end
+end
+
+% Format axes
+xticks(x_positions)
+xticklabels(arrayfun(@(x) sprintf('%.1f',x), alpha_vals,'UniformOutput',false))
+xlabel('\alpha')
+ylabel('Estimated value')
+title('Comparison of RFM (orange) vs TNV-RFM (blue)')
+grid on;
+
+% Legend
+plot(nan,nan,'s','MarkerFaceColor',colors{1},'MarkerEdgeColor','k');
+plot(nan,nan,'s','MarkerFaceColor',colors{2},'MarkerEdgeColor','k');
+legend({'RFM','TNV-RFM'}, 'Location','best');
+
+
+
+%% BOXPLOTS ALL
+
+% Folder where the data is stored
+dirOut = 'D:\emirandaz\qus\rfm\IUS2025\presentation\simuLIM';
+
+% Alpha values to include
+alpha_vals = [0.4, 0.5, 0.6, 0.7, 1.0];
+
+allData = [];
+group = [];
+labels = {};
+
+% Collect data
+for i = 1:numel(alpha_vals)
+    alpha = alpha_vals(i);
+    dataName = sprintf('out_%.1f.mat', alpha);
+    S = load(fullfile(dirOut, dataName));
+
+    % Append values
+    allData = [allData; S.a_rfm(:); S.a_tnv_rfm(:)];
+
+    % Grouping indices
+    group = [group; repmat(i*2-1, numel(S.a_rfm), 1); ...
+                    repmat(i*2,   numel(S.a_tnv_rfm), 1)];
+
+    % Labels (two per alpha)
+    labels{end+1} = sprintf('%.1f RFM', alpha);
+    labels{end+1} = sprintf('%.1f TNV-RFM', alpha);
+end
+
+% Make boxplot
+figure;
+boxplot(allData, group, 'Labels', labels, 'Colors', 'kb'); % temp colors
+hold on;
+
+% Recolor boxes: odd=orange, even=blue
+h = findobj(gca,'Tag','Box');
+for j = 1:length(h)
+    if mod(length(h)-j+1,2)==1
+        patch(get(h(j),'XData'), get(h(j),'YData'), [1 0.5 0], 'FaceAlpha',0.5); % orange
+    else
+        patch(get(h(j),'XData'), get(h(j),'YData'), [0 0.45 0.74], 'FaceAlpha',0.5); % blue
+    end
+end
+
+title('Comparison of a_{rfm} (orange) and a_{tnv\_rfm} (blue)');
+ylabel('Estimated Value');
+grid on;
+
+
+
+
+
+%% SAVE FIG
+dirOut = 'D:\emirandaz\qus\rfm\IUS2025\abstract\simuLIM';
+if ~exist(dirOut) mkdir(dirOut); end
+
+nameFig = ['LIM_S', num2str(alpha_sam),'_fig'];
+
+save_all_figures_to_directory(dirOut, nameFig, 'svg')
 
 %% SAVE TABLE METRICS
 
@@ -683,9 +906,8 @@ T        = struct2table(Metrics);
 T.method = categorical(T.method);
 
 % Write to Excel
-nameExcel = ['LIM_P', num2str(iPhantom)]; 
+nameExcel = ['LIM_simu', num2str(rf_sam_name)]; 
 
 excelFile = fullfile(dirOut, nameExcel+".xlsx");
 
 writetable(T, excelFile, 'Sheet', 'Metrics', 'WriteRowNames', true);
-

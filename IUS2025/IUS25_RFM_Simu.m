@@ -581,6 +581,14 @@ text(2, 1, str_tnv, ...
 % Adjust axes to fit textbox
 ax.YLim = [ylims(1)-0.1*(ylims(2)-ylims(1)), ylims(2)];
 
+%%
+keyboard
+
+mask_homo = logical(ones(size(a_rfm)));
+
+metrics_RFM = get_metrics_homo_gt(a_rfm, mask_homo, gt_acs, 'RFM');
+metrics_TNV = get_metrics_homo_gt(a_tnv_rfm, mask_homo, gt_acs, 'TNV');
+
 %% SAVE FIG
 dirOut = 'D:\emirandaz\qus\rfm\IUS2025\abstract\simuLIM';
 if ~exist(dirOut) mkdir(dirOut); end
@@ -597,7 +605,7 @@ T        = struct2table(Metrics);
 T.method = categorical(T.method);
 
 % Write to Excel
-nameExcel = ['LIM_P', num2str(iPhantom)]; 
+nameExcel = ['LIM_simu', num2str(rf_sam_name)]; 
 
 excelFile = fullfile(dirOut, nameExcel+".xlsx");
 
